@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Http\Requests\StoreJudgeRequest;
+use App\Http\Requests\JudgeRequest\StoreJudgeRequest;
 use App\Http\Resources\JudgeResource;
 use App\Models\Judge;
 

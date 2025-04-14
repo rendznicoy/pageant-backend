@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\ScoreRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreUserRequest extends FormRequest
+class StoreScoreRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -22,12 +22,11 @@ class StoreUserRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'username' => 'required|unique:users|min:3',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|min:8',
-            'first_name' => 'required|string',
-            'last_name' => 'required|string',
-            'role' => 'required|in:Admin,Tabulator,Judge',
+            'event_id' => 'required|exists:events,event_id',
+            'judge_id' => 'required|exists:judges,judge_id',
+            'candidate_id' => 'required|exists:candidates,candidate_id',
+            'category_id' => 'required|exists:categories,category_id',
+            'score' => 'required|integer|min:1|max:10',
         ];
     }
 }

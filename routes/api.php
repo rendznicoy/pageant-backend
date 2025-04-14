@@ -21,15 +21,24 @@ use App\Http\Controllers\PdfReportController;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
+// Auth Controller
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/logout', [AuthController::class, 'logout']);
+});
 
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/logout', [AuthController::class, 'logout']);
 Route::middleware('auth:sanctum')->get('/user', fn(Request $request) => $request->user());
 Route::apiResource('users', UserController::class)->only(['index', 'store']);
+
 Route::apiResource('events', EventController::class);
+
 Route::apiResource('categories', CategoryController::class);
+
 Route::apiResource('candidates', CandidateController::class);
+
 Route::apiResource('judges', JudgeController::class);
+
 Route::get('/scores', [ScoreController::class, 'index']);
 Route::post('/scores', [ScoreController::class, 'store']);
 

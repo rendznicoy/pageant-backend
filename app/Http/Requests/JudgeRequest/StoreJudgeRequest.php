@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\JudgeRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreCandidateRequest extends FormRequest
+class StoreJudgeRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -22,13 +22,8 @@ class StoreCandidateRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'user_id' => 'required|exists:users,user_id',
             'event_id' => 'required|exists:events,event_id',
-            'candidate_number' => 'required|integer',
-            'first_name' => 'required|string',
-            'last_name' => 'required|string',
-            'sex' => 'required|in:male,female',
-            'team' => 'required|string',
-            'photo' => 'nullable|image|max:2048',
         ];
     }
 }

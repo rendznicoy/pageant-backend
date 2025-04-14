@@ -1,17 +1,17 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\AuthRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreScoreRequest extends FormRequest
+class LoginRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -22,11 +22,8 @@ class StoreScoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'event_id' => 'required|exists:events,event_id',
-            'judge_id' => 'required|exists:judges,judge_id',
-            'candidate_id' => 'required|exists:candidates,candidate_id',
-            'category_id' => 'required|exists:categories,category_id',
-            'score' => 'required|integer|min:1|max:10',
+            'username' => 'required|string|min:3',
+            'password' => 'required|string|min:8',
         ];
     }
 }

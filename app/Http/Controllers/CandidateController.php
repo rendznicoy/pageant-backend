@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Http\Requests\StoreCandidateRequest;
+use App\Http\Requests\CandidateRequest\StoreCandidateRequest;
 use App\Http\Resources\CandidateResource;
 use App\Models\Candidate;
 

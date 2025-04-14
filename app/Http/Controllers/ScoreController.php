@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Http\Requests\StoreScoreRequest;
+use App\Http\Requests\ScoreRequest\StoreScoreRequest;
 use App\Models\Score;
 use App\Http\Resources\ScoreResource;
 use App\Models\Event;
