@@ -33,36 +33,42 @@ class Handler extends ExceptionHandler
 
     public function render($request, Throwable $exception)
     {
-        // Handle Validation errors
-        if ($exception instanceof ValidationException) {
+        // Return JSON for any API route or JSON request
+        if ($request->is('api/*') || $request->expectsJson()) {
+            // Special handling for known exception types (optional)
+            if ($exception instanceof ValidationException) {
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $exception->errors(),
+                ], 422);
+            }
+
+            if ($exception instanceof ModelNotFoundException) {
+                return response()->json([
+                    'message' => 'Resource not found',
+                ], 404);
+            }
+
+            if ($exception instanceof NotFoundHttpException) {
+                return response()->json([
+                    'message' => 'Endpoint not found',
+                ], 404);
+            }
+
+            // Handle other exceptions (default to 500)
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $exception->getMessage() ?: 'Server Error',
+                ], 500);
+            }
+
+            // Default for all other exceptions (fallback)
             return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $exception->errors(),
-            ], 422);
+                'message' => $exception->getMessage() ?: 'Bad Request',
+            ], 400);
         }
 
-        // Handle Model not found
-        if ($exception instanceof ModelNotFoundException) {
-            return response()->json([
-                'message' => 'Resource not found',
-            ], 404);
-        }
-
-        // Handle NotFoundHttpException (e.g. 404 routes)
-        if ($exception instanceof NotFoundHttpException) {
-            return response()->json([
-                'message' => 'Endpoint not found',
-            ], 404);
-        }
-
-        // Handle other exceptions (default to 500)
-        if ($request->expectsJson()) {
-            return response()->json([
-                'message' => $exception->getMessage() ?: 'Server Error',
-            ], 500);
-        }
-
-        // Fallback to Laravel default
+        // Default for non-API (web) requests
         return parent::render($request, $exception);
     }
 }
