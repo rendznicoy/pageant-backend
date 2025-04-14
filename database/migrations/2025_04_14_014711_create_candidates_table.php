@@ -11,15 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('users', function (Blueprint $table) {
-            $table->id('user_id'); // Explicit PK
-            $table->string('username')->unique();
-            $table->string('email')->unique();
-            $table->string('password');
+        Schema::create('candidates', function (Blueprint $table) {
+            $table->id('candidate_id');
+            $table->foreignId('event_id')->constrained('events', 'event_id')->onDelete('cascade');
+            $table->string('candidate_number');
             $table->string('first_name');
             $table->string('last_name');
-            $table->enum('role', ['Admin', 'Tabulator', 'Judge']);
-            $table->rememberToken();
+            $table->enum('sex', ['male', 'female']);
+            $table->string('team');
+            $table->binary('photo')->nullable(); // BLOB
             $table->timestamps();
         });
     }
@@ -29,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('users');
+        Schema::dropIfExists('candidates');
     }
 };
