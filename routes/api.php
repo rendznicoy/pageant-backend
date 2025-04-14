@@ -9,6 +9,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CandidateController;
 use App\Http\Controllers\JudgeController;
 use App\Http\Controllers\ScoreController;
+use App\Http\Controllers\PdfReportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -31,3 +32,6 @@ Route::apiResource('candidates', CandidateController::class);
 Route::apiResource('judges', JudgeController::class);
 Route::get('/scores', [ScoreController::class, 'index']);
 Route::post('/scores', [ScoreController::class, 'store']);
+
+Route::middleware(['auth:sanctum', 'can:export-scores'])
+    ->get('/pdf/event-scores/{event_id}', [PdfReportController::class, 'eventScores']);
