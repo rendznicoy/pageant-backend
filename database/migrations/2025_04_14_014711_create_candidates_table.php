@@ -21,6 +21,8 @@ return new class extends Migration
             $table->string('team');
             $table->binary('photo')->nullable(); // BLOB
             $table->timestamps();
+
+            $table->unique(['event_id', 'candidate_number', 'sex'], 'unique_candidate');
         });
     }
 

@@ -1,0 +1,28 @@
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class CandidateResource extends JsonResource
+{
+    /**
+     * Transform the resource into an array.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        return [
+            'candidate_id' => $this->candidate_id,
+            'event_id' => $this->event_id,
+            'candidate_number' => $this->candidate_number,
+            'first_name' => $this->first_name,
+            'last_name' => $this->last_name,
+            'sex' => $this->sex,
+            'team' => $this->team,
+            'photo' => base64_encode($this->photo),
+        ];
+    }
+}
