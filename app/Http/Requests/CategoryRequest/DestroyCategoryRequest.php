@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Requests\ScoreRequest;
+namespace App\Http\Requests\CategoryRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreScoreRequest extends FormRequest
+class DestroyCategoryRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -22,11 +22,8 @@ class StoreScoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'event_id' => 'required|exists:events,event_id',
-            'judge_id' => 'required|exists:judges,judge_id',
-            'candidate_id' => 'required|exists:candidates,candidate_id',
             'category_id' => 'required|exists:categories,category_id',
-            'score' => 'required|integer|min:1|max:10',
+            'event_id' => 'required|exists:events,event_id',
         ];
     }
 }

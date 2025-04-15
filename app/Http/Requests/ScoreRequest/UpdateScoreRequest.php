@@ -4,7 +4,7 @@ namespace App\Http\Requests\ScoreRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreScoreRequest extends FormRequest
+class UpdateScoreRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.

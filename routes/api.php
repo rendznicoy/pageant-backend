@@ -21,26 +21,38 @@ use App\Http\Controllers\PdfReportController;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
-// Auth Controller
+// Public Auth Routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/logout', [AuthController::class, 'logout']);
 });
 
-Route::middleware('auth:sanctum')->get('/user', fn(Request $request) => $request->user());
-Route::apiResource('users', UserController::class)->only(['index', 'store']);
+// Protected Routes
+Route::middleware('auth:sanctum')->group(function () {
+    
+    Route::post('/logout', [AuthController::class, 'logout']);
 
-Route::apiResource('events', EventController::class);
+    // Users
+    Route::apiResource('users', UserController::class);
 
-Route::apiResource('categories', CategoryController::class);
+    // Events
+    Route::apiResource('events', EventController::class);
+    Route::post('/events/{id}/start', [EventController::class, 'start']);
+    Route::post('/events/{id}/finalize', [EventController::class, 'finalize']);
+    Route::post('/events/{id}/reset', [EventController::class, 'reset']);
 
-Route::apiResource('candidates', CandidateController::class);
+    // Categories
+    Route::apiResource('categories', CategoryController::class);
 
-Route::apiResource('judges', JudgeController::class);
+    // Candidates
+    Route::apiResource('candidates', CandidateController::class);
 
-Route::get('/scores', [ScoreController::class, 'index']);
-Route::post('/scores', [ScoreController::class, 'store']);
+    // Judges
+    Route::apiResource('judges', JudgeController::class);
 
-Route::middleware(['auth:sanctum', 'can:export-scores'])
-    ->get('/pdf/event-scores/{event_id}', [PdfReportController::class, 'eventScores']);
+    // Scores
+    Route::apiResource('scores', ScoreController::class)->only(['index', 'store', 'show']);
+
+    // PDF Download
+    Route::get('/pdf/event-scores/{event_id}', [PdfReportController::class, 'download']);
+});
