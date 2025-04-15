@@ -3,6 +3,8 @@
 namespace App\Http\Requests\EventRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StartEventRequest extends FormRequest
 {
@@ -12,6 +14,13 @@ class StartEventRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'event_id' => $this->route('event_id'),
+        ]);
     }
 
     /**
@@ -24,5 +33,14 @@ class StartEventRequest extends FormRequest
         return [
             'event_id' => 'required|exists:events,event_id',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Start event request failed validation.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }

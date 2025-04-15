@@ -3,6 +3,8 @@
 namespace App\Http\Requests\UserRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StoreUserRequest extends FormRequest
 {
@@ -14,6 +16,14 @@ class StoreUserRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'email' => strtolower(trim($this->email)),
+            'username' => trim($this->username),
+        ]);
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -22,12 +32,21 @@ class StoreUserRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'username' => 'required|unique:users|min:3',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|min:8',
-            'first_name' => 'required|string',
-            'last_name' => 'required|string',
+            'username' => 'required|unique:users|min:3|max:30|unique:users,username',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:8|string|confirmed|max:100',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
             'role' => 'required|in:Admin,Tabulator,Judge',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Validation failed.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }

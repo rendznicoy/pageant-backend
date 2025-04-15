@@ -3,6 +3,8 @@
 namespace App\Http\Requests\ScoreRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class DestroyScoreRequest extends FormRequest
 {
@@ -12,6 +14,16 @@ class DestroyScoreRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'event_id' => $this->route('event_id'),
+            'judge_id' => $this->route('judge_id'),
+            'candidate_id' => $this->route('candidate_id'),
+            'category_id' => $this->route('category_id'),
+        ]);
     }
 
     /**
@@ -27,5 +39,14 @@ class DestroyScoreRequest extends FormRequest
             'candidate_id' => 'required|exists:candidates,candidate_id',
             'category_id' => 'required|exists:categories,category_id',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Failed to validate score deletion.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }

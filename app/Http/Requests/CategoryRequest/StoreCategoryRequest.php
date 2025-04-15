@@ -3,6 +3,8 @@
 namespace App\Http\Requests\CategoryRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StoreCategoryRequest extends FormRequest
 {
@@ -23,9 +25,18 @@ class StoreCategoryRequest extends FormRequest
     {
         return [
             'event_id' => 'required|exists:events,event_id',
-            'category_name' => 'required|string',
+            'category_name' => 'required|string|max:50',
             'category_weight' => 'required|numeric|min:0|max:100',
             'max_score' => 'required|integer|min:1|max:10',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Validation failed.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }

@@ -3,6 +3,8 @@
 namespace App\Http\Requests\CandidateRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StoreCandidateRequest extends FormRequest
 {
@@ -24,11 +26,20 @@ class StoreCandidateRequest extends FormRequest
         return [
             'event_id' => 'required|exists:events,event_id',
             'candidate_number' => 'required|integer',
-            'first_name' => 'required|string',
-            'last_name' => 'required|string',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
             'sex' => 'required|in:male,female',
             'team' => 'required|string',
-            'photo' => 'nullable|image|max:2048',
+            'photo' => 'nullable|image|max:10240|mimes:png,jpg,jpeg',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Validation failed.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }

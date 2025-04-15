@@ -3,6 +3,8 @@
 namespace App\Http\Requests\EventRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StoreEventRequest extends FormRequest
 {
@@ -22,11 +24,21 @@ class StoreEventRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'event_name' => 'required|string',
+            'event_name' => 'required|string|max:50',
             'event_code' => 'required|unique:events',
-            'event_date' => 'required|date',
-            'status' => 'in:inactive,active,completed',
+            'start_date' => 'required|date|date_format:Y-m-d',
+            'end_date' => 'required|date|date_format:Y-m-d|after_or_equal:start_date',
+            'status' => 'required|in:inactive,active,completed',
             'created_by' => 'required|exists:users,user_id',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Validation failed.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }

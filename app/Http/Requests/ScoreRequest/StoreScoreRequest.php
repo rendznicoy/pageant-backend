@@ -3,6 +3,8 @@
 namespace App\Http\Requests\ScoreRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StoreScoreRequest extends FormRequest
 {
@@ -28,5 +30,14 @@ class StoreScoreRequest extends FormRequest
             'category_id' => 'required|exists:categories,category_id',
             'score' => 'required|integer|min:1|max:10',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Validation failed.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }

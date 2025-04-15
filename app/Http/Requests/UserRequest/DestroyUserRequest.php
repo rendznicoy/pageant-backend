@@ -3,6 +3,8 @@
 namespace App\Http\Requests\UserRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class DestroyUserRequest extends FormRequest
 {
@@ -24,5 +26,14 @@ class DestroyUserRequest extends FormRequest
         return [
             'user_id' => 'required|exists:users,user_id',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Failed to validate user deletion.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }

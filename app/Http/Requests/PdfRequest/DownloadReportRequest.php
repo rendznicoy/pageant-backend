@@ -3,6 +3,8 @@
 namespace App\Http\Requests\PdfRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class DownloadReportRequest extends FormRequest
 {
@@ -12,6 +14,13 @@ class DownloadReportRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'event_id' => $this->route('event_id'),
+        ]);
     }
 
     /**
@@ -24,5 +33,14 @@ class DownloadReportRequest extends FormRequest
         return [
             'event_id' => 'required|exists:events,event_id',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Failed to validate download request.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }

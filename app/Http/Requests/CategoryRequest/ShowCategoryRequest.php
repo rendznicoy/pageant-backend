@@ -3,6 +3,8 @@
 namespace App\Http\Requests\CategoryRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class ShowCategoryRequest extends FormRequest
 {
@@ -12,6 +14,14 @@ class ShowCategoryRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'category_id' => $this->category_id,
+            'event_id' => $this->event_id,
+        ]);
     }
 
     /**
@@ -25,5 +35,14 @@ class ShowCategoryRequest extends FormRequest
             'category_id' => 'required|exists:categories,category_id',
             'event_id' => 'required|exists:events,event_id',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Invalid request.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }

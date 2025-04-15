@@ -3,6 +3,10 @@
 namespace App\Http\Requests\AuthRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class RegisterRequest extends FormRequest
 {
@@ -24,10 +28,22 @@ class RegisterRequest extends FormRequest
         return [
             'username' => 'required|string|min:3|unique:users,username',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8|confirmed',
+            'password' => 'required|string|min:8|confirmed|max:100',
+            'password_confirmation' => 'required|string|min:8|max:100',
             'first_name' => 'required|string',
             'last_name' => 'required|string',
             'role' => 'required|in:Admin,Tabulator,Judge',
         ];
+    }
+
+    /**
+     * Handle failed validation response as JSON.
+     */
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'message' => 'Registration validation failed.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }

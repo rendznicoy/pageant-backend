@@ -4,6 +4,7 @@ namespace App\Http\Requests\CandidateRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+
 class ShowCandidateRequest extends FormRequest
 {
     /**
@@ -12,6 +13,14 @@ class ShowCandidateRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'event_id' => $this->route('event_id'),
+            'candidate_id' => $this->route('candidate_id'),
+        ]);
     }
 
     /**

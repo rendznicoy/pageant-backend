@@ -3,6 +3,8 @@
 namespace App\Http\Requests\CategoryRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class DestroyCategoryRequest extends FormRequest
 {
@@ -12,6 +14,14 @@ class DestroyCategoryRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'event_id' => $this->route('event_id'),
+            'category_id' => $this->route('category_id'),
+        ]);
     }
 
     /**
@@ -25,5 +35,14 @@ class DestroyCategoryRequest extends FormRequest
             'category_id' => 'required|exists:categories,category_id',
             'event_id' => 'required|exists:events,event_id',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Failed to validate category deletion.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }

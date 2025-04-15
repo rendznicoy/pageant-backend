@@ -3,6 +3,8 @@
 namespace App\Http\Requests\JudgeRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class UpdateJudgeRequest extends FormRequest
 {
@@ -24,7 +26,16 @@ class UpdateJudgeRequest extends FormRequest
         return [
             'judge_id' => 'required|exists:judges,judge_id',
             'event_id' => 'required|exists:events,event_id',
-            'user_id' => 'sometimes|exists:users,user_id',
+            'user_id' => 'required|exists:users,user_id',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Validation failed.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }
