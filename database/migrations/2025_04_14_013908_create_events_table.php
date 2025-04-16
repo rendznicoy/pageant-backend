@@ -15,7 +15,8 @@ return new class extends Migration
             $table->id('event_id');
             $table->string('event_name');
             $table->string('event_code')->unique();
-            $table->date('event_date');
+            $table->date('start_date');
+            $table->date('end_date');
             $table->enum('status', ['inactive', 'active', 'completed'])->default('inactive');
             $table->foreignId('created_by')->constrained('users', 'user_id')->onDelete('cascade');
             $table->timestamps();

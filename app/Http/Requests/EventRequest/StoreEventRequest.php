@@ -25,7 +25,7 @@ class StoreEventRequest extends FormRequest
     {
         return [
             'event_name' => 'required|string|max:50',
-            'event_code' => 'required|unique:events',
+            'event_code' => 'required|string|unique:events,event_code',
             'start_date' => 'required|date|date_format:Y-m-d',
             'end_date' => 'required|date|date_format:Y-m-d|after_or_equal:start_date',
             'status' => 'required|in:inactive,active,completed',

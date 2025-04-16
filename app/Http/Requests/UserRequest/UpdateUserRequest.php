@@ -26,7 +26,7 @@ class UpdateUserRequest extends FormRequest
         return [
             'username' => 'sometimes|string|min:3|unique:users,username,' . $this->user->user_id . ',user_id',
             'email' => 'sometimes|email|unique:users,email,' . $this->user->user_id . ',user_id',
-            'password' => 'nullable|string|min:8',
+            'password' => 'sometimes|string|min:8|max:100',
             'first_name' => 'sometimes|string|max:255',
             'last_name' => 'sometimes|string|max:255',
             'role' => 'sometimes|in:Admin,Tabulator,Judge',
