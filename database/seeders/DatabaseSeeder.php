@@ -13,7 +13,7 @@ use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
+    /* *
      * Seed the application's database.
      */
     /* public function run(): void
@@ -79,7 +79,7 @@ class DatabaseSeeder extends Seeder
         }   
     } */
 
-    public function run(): void
+/*     public function run(): void
     {
         // Create Admin & Tabulator
         $admin = User::factory()->create([
@@ -220,5 +220,52 @@ class DatabaseSeeder extends Seeder
         Candidate::factory()->count(5)->create([
             'event_id' => $inactiveEvent->event_id,
         ]);
+    } */
+
+    public function run(): void
+    {
+        // Create an event and immediately retrieve it from the database to ensure we have the correct ID
+        $event = Event::factory()->active()->create();
+        $event = Event::find($event->event_id); // Refresh to get the actual database-assigned ID
+
+        // Create judges with the refreshed event ID
+        $judges = Judge::factory()
+            ->count(5)
+            ->create([
+                'event_id' => $event->event_id // Use the primary key value directly
+            ]);
+
+        // Create categories
+        $categories = Category::factory()->count(3)->create();
+
+        // Shared candidate numbering system for this event
+        $candidateNumbers = range(1, 5); // Assuming 5 candidates per gender
+
+        // Create male candidates with shared candidate numbers
+        $maleCandidates = collect($candidateNumbers)->map(function ($number) use ($event) {
+            return Candidate::factory()->male()->create([
+                'candidate_number' => $number,
+                'event_id' => $event->event_id, // Associate with the current event
+            ]);
+        });
+
+        // Create female candidates with shared candidate numbers
+        $femaleCandidates = collect($candidateNumbers)->map(function ($number) use ($event) {
+            return Candidate::factory()->female()->create([
+                'candidate_number' => $number,
+                'event_id' => $event->event_id, // Associate with the current event
+            ]);
+        });
+
+        // Assign scores to candidates in each category
+        foreach ($judges as $judge) {
+            foreach ($categories as $category) {
+                foreach ($maleCandidates->concat($femaleCandidates) as $candidate) {
+                    Score::factory()->create([
+                        'score' => rand(1, 10),
+                    ]);
+                }
+            }
+        }
     }
 }
