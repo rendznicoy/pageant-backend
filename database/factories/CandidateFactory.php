@@ -27,4 +27,25 @@ class CandidateFactory extends Factory
             'photo' => null,
         ];
     }
+
+    public function male(): static
+    {
+        return $this->state([
+            'sex' => 'male',
+            'team' => 'Gladiators',
+        ]);
+    }
+
+    public function female(): static
+    {
+        return $this->state([
+            'sex' => 'female',
+            'team' => 'Gladiators',
+        ]);
+    }
+
+    public function number(int $num): static
+    {
+        return $this->state(['candidate_number' => $num]);
+    }
 }

@@ -24,4 +24,16 @@ class CategoryFactory extends Factory
             'max_score' => 10,
         ];
     }
+
+    public function weighted(): static
+    {
+        return $this->state([
+            'category_weight' => fake()->randomFloat(2, 30, 50),
+        ]);
+    }
+
+    public function named(string $name): static
+    {
+        return $this->state(['category_name' => $name]);
+    }
 }

@@ -20,9 +20,25 @@ class EventFactory extends Factory
         return [
             'event_name' => fake()->catchPhrase(),
             'event_code' => strtoupper(fake()->unique()->lexify('EVT???')),
-            'event_date' => fake()->dateTimeBetween('now', '+6 months'),
+            'start_date' => fake()->dateTimeBetween('now', '+6 months'),
+            'end_date' => fake()->dateTimeBetween('+6 months', '+1 year'),
             'status' => fake()->randomElement(['inactive', 'active', 'completed']),
             'created_by' => User::factory(),
         ];
+    }
+
+    public function inactive(): static
+    {
+        return $this->state(['status' => 'inactive']);
+    }
+
+    public function active(): static
+    {
+        return $this->state(['status' => 'active']);
+    }
+
+    public function completed(): static
+    {
+        return $this->state(['status' => 'completed']);
     }
 }
