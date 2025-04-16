@@ -20,7 +20,8 @@ class EventResource extends JsonResource
             'event_id' => $this->event_id,
             'event_name' => $this->event_name,
             'event_code' => $this->event_code,
-            'event_date' => $this->event_date,
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
             'status' => $this->status,
             'created_by' => new UserResource($this->whenLoaded('creator')),
         ];

@@ -9,6 +9,8 @@ class Category extends Model
 {
     use HasFactory;
 
+    protected $table = 'categories';
+
     protected $primaryKey = 'category_id';
 
     protected $fillable = [
@@ -16,6 +18,11 @@ class Category extends Model
         'event_id',
         'category_weight',
         'max_score',
+    ];
+
+    protected $casts = [
+        'category_weight' => 'numeric',
+        'max_score' => 'integer',
     ];
 
     public function event()

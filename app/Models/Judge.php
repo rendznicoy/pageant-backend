@@ -9,6 +9,8 @@ class Judge extends Model
 {
     use HasFactory;
 
+    protected $table = 'judges';
+
     protected $primaryKey = 'judge_id';
 
     protected $fillable = [

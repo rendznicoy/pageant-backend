@@ -12,6 +12,8 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
+    protected $table = 'users';
+
     protected $primaryKey = 'user_id';
 
     /**
@@ -26,6 +28,10 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+    ];
+
+    protected $attributes = [
+        'role' => 'Judge', // Default to lowest access level
     ];
 
     /**
@@ -57,4 +63,12 @@ class User extends Authenticatable
     {
         return $this->hasOne(Judge::class, 'user_id');
     }
+
+    // To be decided
+    /* public function getProfilePhotoUrlAttribute()
+    {
+        return $this->profile_photo
+            ? 'data:image/jpeg;base64,' . base64_encode($this->profile_photo)
+            : null;
+    } */
 }
