@@ -16,43 +16,85 @@ use App\Http\Controllers\PdfReportController;
 | API Routes
 |--------------------------------------------------------------------------
 |
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
+| This file defines API routes for version 1 (v1). All routes are
+| assigned to the "api" middleware group.
 |
 */
-// Public Auth Routes
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/register', [AuthController::class, 'register']);
-});
 
-// Protected Routes
-Route::middleware('auth:sanctum')->group(function () {
-    
-    Route::post('/logout', [AuthController::class, 'logout']);
+Route::prefix('v1')->group(function () {
 
-    // Users
-    Route::apiResource('users', UserController::class);
+    // Public Auth Routes
+    Route::post('login', [AuthController::class, 'login']);
+    Route::post('register', [AuthController::class, 'register']);
 
-    // Events
-    Route::apiResource('events', EventController::class);
-    Route::post('/events/{id}/start', [EventController::class, 'start']);
-    Route::post('/events/{id}/finalize', [EventController::class, 'finalize']);
-    Route::post('/events/{id}/reset', [EventController::class, 'reset']);
+    // Authenticated User Routes
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('logout', [AuthController::class, 'logout']);
+        Route::get('users', [UserController::class, 'index']);
+        Route::get('user', [UserController::class, 'show']);
+        Route::post('users', [UserController::class, 'store']);
+        Route::patch('users/{user}', [UserController::class, 'update']);
+        Route::delete('users/{user}', [UserController::class, 'destroy']);
+    });
 
-    // Categories
-    Route::apiResource('categories', CategoryController::class);
+    // Admin and Tabulator-only routes
+    Route::middleware(['auth:sanctum', 'role:admin,tabulator'])->group(function () {
 
-    // Candidates
-    Route::apiResource('candidates', CandidateController::class);
+        // Events
+        Route::prefix('events')->group(function () {
+            Route::post('create', [EventController::class, 'store']);
+            Route::get('/', [EventController::class, 'index']);
+            Route::get('{event_id}', [EventController::class, 'show']);
+            Route::patch('{event_id}/edit', [EventController::class, 'update']);
+            Route::delete('{event_id}', [EventController::class, 'destroy']);
 
-    // Judges
-    Route::apiResource('judges', JudgeController::class);
+            // Event status actions
+            Route::post('{event_id}/start', [EventController::class, 'start']);
+            Route::post('{event_id}/finalize', [EventController::class, 'finalize']);
+            Route::post('{event_id}/reset', [EventController::class, 'reset']);
 
-    // Scores
-    Route::apiResource('scores', ScoreController::class)->only(['index', 'store', 'show']);
+            // Nested resources within an event
+            Route::prefix('{event_id}')->group(function () {
 
-    // PDF Download
-    Route::get('/pdf/event-scores/{event_id}', [PdfReportController::class, 'download']);
+                // Categories
+                Route::prefix('categories')->group(function () {
+                    Route::get('/', [CategoryController::class, 'index']);
+                    Route::post('create', [CategoryController::class, 'store']);
+                    Route::get('{category_id}', [CategoryController::class, 'show']);
+                    Route::patch('{category_id}/edit', [CategoryController::class, 'update']);
+                    Route::delete('{category_id}', [CategoryController::class, 'destroy']);
+                });
+
+                // Candidates
+                Route::prefix('candidates')->group(function () {
+                    Route::get('/', [CandidateController::class, 'index']);
+                    Route::post('create', [CandidateController::class, 'store']);
+                    Route::get('{candidate_id}', [CandidateController::class, 'show']);
+                    Route::patch('{candidate_id}/edit', [CandidateController::class, 'update']);
+                    Route::delete('{candidate_id}', [CandidateController::class, 'destroy']);
+                });
+
+                // Judges
+                Route::prefix('judges')->group(function () {
+                    Route::get('/', [JudgeController::class, 'index']);
+                    Route::post('create', [JudgeController::class, 'store']);
+                    Route::get('{judge_id}', [JudgeController::class, 'show']);
+                    Route::patch('{judge_id}/edit', [JudgeController::class, 'update']);
+                    Route::delete('{judge_id}', [JudgeController::class, 'destroy']);
+                });
+
+                // Scores
+                Route::prefix('scores')->group(function () {
+                    Route::get('/', [ScoreController::class, 'index']);
+                    Route::post('create', [ScoreController::class, 'store']);
+                    Route::get('{score_id}', [ScoreController::class, 'show']);
+                    Route::patch('{score_id}/edit', [ScoreController::class, 'update']);
+                    Route::delete('{score_id}', [ScoreController::class, 'destroy']);
+                });
+
+                // PDF Report
+                Route::get('report', [PdfReportController::class, 'download']);
+            });
+        });
+    });
 });
