@@ -87,9 +87,9 @@ Route::prefix('v1')->group(function () {
                 Route::prefix('scores')->group(function () {
                     Route::get('/', [ScoreController::class, 'index']);
                     Route::post('create', [ScoreController::class, 'store']);
-                    Route::get('{score_id}', [ScoreController::class, 'show']);
-                    Route::patch('{score_id}/edit', [ScoreController::class, 'update']);
-                    Route::delete('{score_id}', [ScoreController::class, 'destroy']);
+                    Route::get('show', [ScoreController::class, 'show']);
+                    Route::patch('edit/{judge_id}/{candidate_id}/{category_id}', [ScoreController::class, 'update']);
+                    Route::delete('delete', [ScoreController::class, 'destroy']);
                 });
 
                 // PDF Report

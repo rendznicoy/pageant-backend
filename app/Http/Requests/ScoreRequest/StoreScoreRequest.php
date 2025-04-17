@@ -16,6 +16,13 @@ class StoreScoreRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation()
+    {
+        $this->merge([
+            'event_id' => $this->route('event_id'),
+        ]);
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *

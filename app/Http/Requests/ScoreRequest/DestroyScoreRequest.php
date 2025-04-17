@@ -5,6 +5,7 @@ namespace App\Http\Requests\ScoreRequest;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
 class DestroyScoreRequest extends FormRequest
 {
@@ -20,9 +21,6 @@ class DestroyScoreRequest extends FormRequest
     {
         $this->merge([
             'event_id' => $this->route('event_id'),
-            'judge_id' => $this->route('judge_id'),
-            'candidate_id' => $this->route('candidate_id'),
-            'category_id' => $this->route('category_id'),
         ]);
     }
 
@@ -35,9 +33,18 @@ class DestroyScoreRequest extends FormRequest
     {
         return [
             'event_id' => 'required|exists:events,event_id',
-            'judge_id' => 'required|exists:judges,judge_id',
-            'candidate_id' => 'required|exists:candidates,candidate_id',
-            'category_id' => 'required|exists:categories,category_id',
+            'judge_id' => [
+                'required',
+                Rule::exists('judges', 'judge_id')->where('event_id', $this->input('event_id')),
+            ],
+            'candidate_id' => [
+                'required',
+                Rule::exists('candidates', 'candidate_id')->where('event_id', $this->input('event_id')),
+            ],
+            'category_id' => [
+                'required',
+                Rule::exists('categories', 'category_id')->where('event_id', $this->input('event_id')),
+            ],
         ];
     }
 

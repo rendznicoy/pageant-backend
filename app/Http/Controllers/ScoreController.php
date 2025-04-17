@@ -13,16 +13,15 @@ use App\Models\Event;
 
 class ScoreController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, $event_id)
     {
-        $eventId = $request->query('event_id');
         $judgeId = $request->query('judge_id');
         $candidateId = $request->query('candidate_id');
         $categoryId = $request->query('category_id');
 
-        $query = Score::with(['judge.user', 'candidate', 'category', 'event']);
+        $query = Score::with(['judge.user', 'candidate', 'category', 'event'])
+                    ->where('event_id', $event_id); // from route
 
-        if ($eventId) $query->where('event_id', $eventId);
         if ($judgeId) $query->where('judge_id', $judgeId);
         if ($candidateId) $query->where('candidate_id', $candidateId);
         if ($categoryId) $query->where('category_id', $categoryId);
@@ -92,32 +91,42 @@ class ScoreController extends Controller
             return response()->json(['message' => 'Scores can only be updated for active events.'], 403);
         }
 
-        $score = Score::where('judge_id', $validated['judge_id'])
+        $updatedRows = Score::where('judge_id', $validated['judge_id'])
             ->where('candidate_id', $validated['candidate_id'])
             ->where('category_id', $validated['category_id'])
             ->where('event_id', $validated['event_id'])
-            ->firstOrFail();
+            ->update(['score' => $validated['score']]);
 
-        $score->update(['score' => $validated['score']]);
+        if ($updatedRows > 0) {
+            $score = Score::where('judge_id', $validated['judge_id'])
+                ->where('candidate_id', $validated['candidate_id'])
+                ->where('category_id', $validated['category_id'])
+                ->where('event_id', $validated['event_id'])
+                ->firstOrFail();
 
-        return response()->json([
-            'message' => 'Score updated successfully.',
-            'score' => new ScoreResource($score->load(['event', 'judge.user', 'candidate', 'category'])),
-        ]);
+            return response()->json([
+                'message' => 'Score updated successfully.',
+                'score' => new ScoreResource($score->load(['event', 'judge.user', 'candidate', 'category'])),
+            ]);
+        } else {
+            return response()->json(['message' => 'Score update failed.'], 500); // Or handle this as appropriate
+        }
     }
 
     public function destroy(DestroyScoreRequest $request)
     {
         $validated = $request->validated();
 
-        $score = Score::where('event_id', $validated['event_id'])
+        $deletedRows = Score::where('event_id', $validated['event_id'])
             ->where('judge_id', $validated['judge_id'])
             ->where('candidate_id', $validated['candidate_id'])
             ->where('category_id', $validated['category_id'])
-            ->firstOrFail();
+            ->delete();
 
-        $score->delete();
-
-        return response()->json(['message' => 'Score deleted successfully.'], 204);
+        if ($deletedRows > 0) {
+            return response()->json(['message' => 'Score deleted successfully.'], 204);
+        } else {
+            return response()->json(['message' => 'Score deletion failed.'], 500); // Or handle this as appropriate
+        }
     }
 }
