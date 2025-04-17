@@ -19,6 +19,7 @@ class UpdateEventRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
+            'event_id' => $this->route('event_id'),
             'event_code' => strtoupper(trim($this->event_code)),
         ]);
     }

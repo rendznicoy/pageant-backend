@@ -69,10 +69,17 @@ class EventControllerTest extends TestCase
     /** @test */
     public function can_create_event()
     {
-        $response = $this->postJson('/api/v1/events', [
+        $user = User::factory()->create(['role' => 'admin']);
+        $this->actingAs($user);
+
+        $response = $this->postJson('/api/v1/events/create', [
             'event_name' => 'Test Event',
             'description' => 'Test Description',
-            'status' => 'inactive'
+            'status' => 'inactive',
+            'event_code' => 'TEST123',
+            'start_date' => '2025-04-20',
+            'end_date' => '2025-04-25',
+            'created_by' => $user->user_id,
         ]);
 
         $response->assertStatus(201)
@@ -104,7 +111,7 @@ class EventControllerTest extends TestCase
     {
         $event = Event::factory()->create();
 
-        $response = $this->putJson('/api/v1/events/' . $event->event_id, [
+        $response = $this->patchJson('/api/v1/events/' . $event->event_id . '/edit', [
             'event_name' => 'Updated Event',
             'description' => $event->description,
             'status' => $event->status
