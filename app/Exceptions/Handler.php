@@ -7,6 +7,7 @@ use Throwable;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Illuminate\Auth\AuthenticationException;
 
 class Handler extends ExceptionHandler
 {
@@ -33,9 +34,7 @@ class Handler extends ExceptionHandler
 
     public function render($request, Throwable $exception)
     {
-        // Return JSON for any API route or JSON request
-        if ($request->is('api/*') || $request->expectsJson()) {
-            // Special handling for known exception types (optional)
+        if ($request->expectsJson() || $request->is('api/*')) {
             if ($exception instanceof ValidationException) {
                 return response()->json([
                     'message' => 'Validation failed',
@@ -55,20 +54,29 @@ class Handler extends ExceptionHandler
                 ], 404);
             }
 
-            // Handle other exceptions (default to 500)
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'message' => $exception->getMessage() ?: 'Server Error',
-                ], 500);
+            if ($exception instanceof AuthenticationException) {
+                return $this->unauthenticated($request, $exception);
             }
 
-            // Default for all other exceptions (fallback)
             return response()->json([
-                'message' => $exception->getMessage() ?: 'Bad Request',
-            ], 400);
+                'message' => $exception->getMessage() ?: 'Server error',
+            ], 500);
         }
 
-        // Default for non-API (web) requests
         return parent::render($request, $exception);
+    }
+
+    /**
+     * Customize the response for unauthenticated users.
+     */
+    protected function unauthenticated($request, AuthenticationException $exception)
+    {
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        return redirect()->guest(route('login'));
     }
 }

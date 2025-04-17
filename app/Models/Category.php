@@ -14,14 +14,14 @@ class Category extends Model
     protected $primaryKey = 'category_id';
 
     protected $fillable = [
-        'category_name',
         'event_id',
+        'category_name',
         'category_weight',
         'max_score',
     ];
 
     protected $casts = [
-        'category_weight' => 'float',
+        'category_weight' => 'decimal:2',
         'max_score' => 'integer',
     ];
 

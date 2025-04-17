@@ -9,13 +9,14 @@ use App\Http\Requests\CategoryRequest\ShowCategoryRequest;
 use App\Http\Requests\CategoryRequest\UpdateCategoryRequest;
 use App\Http\Resources\CategoryResource;
 use App\Models\Category;
+use Illuminate\Support\Facades\Log;
 
 class CategoryController extends Controller
 {
     public function index(Request $request)
     {
         $perPage = 12;
-        $eventId = $request->query('event_id');
+        $eventId = $request->route('event_id') ?? $request->query('event_id');
 
         $query = Category::query();
 
