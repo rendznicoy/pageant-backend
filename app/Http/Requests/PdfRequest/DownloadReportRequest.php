@@ -16,10 +16,10 @@ class DownloadReportRequest extends FormRequest
         return true;
     }
 
-    protected function prepareForValidation(): void
+    protected function prepareForValidation()
     {
         $this->merge([
-            'event_id' => $this->route('event_id'),
+            'event_id' => $this->route('event_id') ?? $this->query('event_id'),
         ]);
     }
 

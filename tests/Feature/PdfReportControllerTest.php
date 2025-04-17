@@ -35,7 +35,7 @@ class PdfReportControllerTest extends TestCase
             'candidate_id' => $candidate->candidate_id
         ]);
 
-        $response = $this->postJson('/api/v1/reports/download', [
+        $response = $this->getJson('/api/v1/events/' . $event->event_id . '/report?event_id=' . $event->event_id, [
             'event_id' => $event->event_id
         ]);
 
