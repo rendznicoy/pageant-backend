@@ -14,6 +14,14 @@ class ShowJudgeRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation()
+    {
+        $this->merge([
+            'judge_id' => $this->route('judge_id'),
+            'event_id' => $this->route('event_id'),
+        ]);
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *

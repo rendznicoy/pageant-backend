@@ -25,7 +25,7 @@ class JudgeControllerTest extends TestCase
         $user = User::factory()->create(['role' => 'judge']);
         Judge::factory()->count(15)->create(['event_id' => $event->event_id, 'user_id' => $user->user_id]);
 
-        $response = $this->getJson('/api/v1/judges?event_id=' . $event->event_id);
+        $response = $this->getJson('/api/v1/events/' . $event->event_id . '/judges/');
 
         $response->assertStatus(200)
             ->assertJsonStructure([
@@ -54,7 +54,7 @@ class JudgeControllerTest extends TestCase
         $event = Event::factory()->create();
         $user = User::factory()->create(['role' => 'judge']);
 
-        $response = $this->postJson('/api/v1/judges', [
+        $response = $this->postJson('/api/v1/events/' . $event->event_id . '/judges/create', [
             'event_id' => $event->event_id,
             'user_id' => $user->user_id
         ]);
@@ -76,7 +76,7 @@ class JudgeControllerTest extends TestCase
         $event = Event::factory()->create();
         $user = User::factory()->create(['role' => 'admin']);
 
-        $response = $this->postJson('/api/v1/judges', [
+        $response = $this->postJson('/api/v1/events/' . $event->event_id . '/judges/create', [
             'event_id' => $event->event_id,
             'user_id' => $user->user_id
         ]);
@@ -90,7 +90,7 @@ class JudgeControllerTest extends TestCase
     {
         $judge = Judge::factory()->create();
 
-        $response = $this->getJson('/api/v1/judges/' . $judge->judge_id . '?event_id=' . $judge->event_id);
+        $response = $this->getJson('/api/v1/events/' . $judge->event_id . '/judges/' . $judge->judge_id);
 
         $response->assertStatus(200)
             ->assertJson([
@@ -105,7 +105,7 @@ class JudgeControllerTest extends TestCase
         $judge = Judge::factory()->create();
         $newUser = User::factory()->create(['role' => 'judge']);
 
-        $response = $this->putJson('/api/v1/judges/' . $judge->judge_id, [
+        $response = $this->patchJson('/api/v1/events/' . $judge->event_id . '/judges/' . $judge->judge_id . '/edit', [
             'event_id' => $judge->event_id,
             'user_id' => $newUser->user_id
         ]);
@@ -126,7 +126,7 @@ class JudgeControllerTest extends TestCase
     {
         $judge = Judge::factory()->create();
 
-        $response = $this->deleteJson('/api/v1/judges/' . $judge->judge_id, [
+        $response = $this->deleteJson('/api/v1/events/' . $judge->event_id . '/judges/' . $judge->judge_id, [
             'event_id' => $judge->event_id
         ]);
 

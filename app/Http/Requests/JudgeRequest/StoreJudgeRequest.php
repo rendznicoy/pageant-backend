@@ -5,6 +5,7 @@ namespace App\Http\Requests\JudgeRequest;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use App\Models\User;
 
 class StoreJudgeRequest extends FormRequest
 {
@@ -24,7 +25,16 @@ class StoreJudgeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'user_id' => 'required|exists:users,user_id',
+            'user_id' => [
+                'required',
+                'exists:users,user_id',
+                function ($attribute, $value, $fail) {
+                    $user = User::find($value);
+                    if (! $user || $user->role !== 'Judge') {
+                        $fail('The selected user is not a judge.');
+                    }
+                },
+            ],
             'event_id' => 'required|exists:events,event_id',
         ];
     }
