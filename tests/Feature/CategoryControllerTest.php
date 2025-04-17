@@ -73,14 +73,15 @@ class CategoryControllerTest extends TestCase
     {
         $event = Event::factory()->create();
 
-        $response = $this->postJson('/api/v1/categories', [
+        $response = $this->postJson('/api/v1/events/{$event->event_id}/categories/create', [
             'event_id' => $event->event_id,
             'category_name' => 'Test Category',
-            'percentage' => 150 // Invalid percentage
+            'category_weight' => '30',
+            'max_score' => '20', // Invalid max_score
         ]);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['percentage']);
+            ->assertJsonValidationErrors(['max_score']);
     }
 
     /** @test */
@@ -88,7 +89,7 @@ class CategoryControllerTest extends TestCase
     {
         $category = Category::factory()->create();
 
-        $response = $this->getJson('/api/v1/categories/' . $category->category_id . '?event_id=' . $category->event_id);
+        $response = $this->getJson('/api/v1/events/' . $category->event_id . '/categories/' . $category->category_id);
 
         $response->assertStatus(200)
             ->assertJson([
@@ -102,10 +103,10 @@ class CategoryControllerTest extends TestCase
     {
         $category = Category::factory()->create();
 
-        $response = $this->putJson('/api/v1/categories/' . $category->category_id, [
+        $response = $this->patchJson('/api/v1/events/{$category->event_id}/categories/{$category->category_id}/edit', [
             'event_id' => $category->event_id,
+            'category_id' => $category->category_id,
             'category_name' => 'Updated Category',
-            'percentage' => 40
         ]);
 
         $response->assertStatus(200)
@@ -124,7 +125,7 @@ class CategoryControllerTest extends TestCase
     {
         $category = Category::factory()->create();
 
-        $response = $this->deleteJson('/api/v1/categories/' . $category->category_id, [
+        $response = $this->deleteJson('/api/v1/events/' . $category->event_id . '/categories/' . $category->category_id, [
             'event_id' => $category->event_id
         ]);
 
