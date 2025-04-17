@@ -53,7 +53,7 @@ class CategoryControllerTest extends TestCase
         $response = $this->postJson('/api/v1/events/{$event->event_id}/categories/create', [
             'event_id' => $event->event_id,
             'category_name' => 'Talent',
-            'category_weight' => '30.00',
+            'category_weight' => '30',
             'max_score' => '10',
         ]);
 

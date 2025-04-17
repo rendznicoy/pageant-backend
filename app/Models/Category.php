@@ -21,7 +21,7 @@ class Category extends Model
     ];
 
     protected $casts = [
-        'category_weight' => 'decimal:2',
+        'category_weight' => 'integer',
         'max_score' => 'integer',
     ];
 
