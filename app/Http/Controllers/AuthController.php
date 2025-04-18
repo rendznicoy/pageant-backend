@@ -24,39 +24,32 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        Auth::login($user); // Use Laravel's session-based login
 
         return response()->json([
-            'user' => $user,
-            'token' => $token,
+            'message' => 'Login successful.',
+            'user' => $user
         ]);
     }
 
     public function register(RegisterRequest $request)
     {
-        $data = $request->validated();
+       $data = $request->validated();
         $data['password'] = Hash::make($data['password']);
 
         $user = User::create($data);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        Auth::login($user); // <- Logs in the user and issues session
 
         return response()->json([
             'message' => 'Registration successful.',
             'user' => $user,
-            'token' => $token,
         ], 201);
     }
 
     public function logout(Request $request)
     {
-        $user = $request->user();
-
-        if (! $user || ! method_exists($user, 'currentAccessToken')) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
-        }
-
-        $user->currentAccessToken()?->delete();
+        Auth::guard('web')->logout();
 
         return response()->json(['message' => 'Logged out']);
     }

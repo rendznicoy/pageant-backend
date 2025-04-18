@@ -32,7 +32,7 @@ class RegisterRequest extends FormRequest
             'password_confirmation' => 'required|string|min:8|max:100',
             'first_name' => 'required|string',
             'last_name' => 'required|string',
-            'role' => 'required|in:Admin,Tabulator,Judge',
+            'role' => 'required|in:admin,tabulator,judge',
         ];
     }
 

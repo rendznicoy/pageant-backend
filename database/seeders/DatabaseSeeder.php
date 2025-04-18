@@ -10,6 +10,7 @@ use App\Models\Category;
 use App\Models\Candidate;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -222,7 +223,7 @@ class DatabaseSeeder extends Seeder
         ]);
     } */
 
-    public function run(): void
+    /* public function run(): void
     {
         // Create an event and immediately retrieve it from the database to ensure we have the correct ID
         $event = Event::factory()->active()->create();
@@ -262,6 +263,74 @@ class DatabaseSeeder extends Seeder
             foreach ($categories as $category) {
                 foreach ($maleCandidates->concat($femaleCandidates) as $candidate) {
                     Score::factory()->create([
+                        'score' => rand(1, 10),
+                    ]);
+                }
+            }
+        }
+    } */
+
+    public function run(): void
+    {
+        // Create a test user you can log in with on Postman
+        $testUser = User::create([
+            'username' => 'TestUser',
+            'email' => 'testuser@example.com',
+            'password' => Hash::make('testpassword'), // Must be hashed
+            'role' => 'tabulator', // or 'admin' depending on your logic
+            'first_name' => 'Test',
+            'last_name' => 'User',
+        ]);
+
+        // Create an event owned by test user
+        $event = Event::factory()->active()->create([
+            'created_by' => $testUser->user_id,
+        ]);
+
+        // Re-fetch event (if needed)
+        $event = Event::find($event->event_id);
+
+        // Create judges and link first one to test user
+        $judges = Judge::factory()->count(5)->create([
+            'event_id' => $event->event_id,
+        ]);
+
+        // Link first judge to test user for testing
+        $judges->first()->update([
+            'user_id' => $testUser->user_id,
+        ]);
+
+        // Create categories linked to the event
+        $categories = Category::factory()->count(3)->create([
+            'event_id' => $event->event_id,
+        ]);
+
+        // Candidate numbers
+        $candidateNumbers = range(1, 5);
+
+        // Male + Female candidates
+        $maleCandidates = collect($candidateNumbers)->map(fn($num) => 
+            Candidate::factory()->male()->create([
+                'candidate_number' => $num,
+                'event_id' => $event->event_id,
+            ])
+        );
+
+        $femaleCandidates = collect($candidateNumbers)->map(fn($num) =>
+            Candidate::factory()->female()->create([
+                'candidate_number' => $num,
+                'event_id' => $event->event_id,
+            ])
+        );
+
+        // Assign scores for all judges, categories, and candidates
+        foreach ($judges as $judge) {
+            foreach ($categories as $category) {
+                foreach ($maleCandidates->concat($femaleCandidates) as $candidate) {
+                    Score::factory()->create([
+                        'judge_id' => $judge->judge_id,
+                        'candidate_id' => $candidate->candidate_id,
+                        'category_id' => $category->category_id,
                         'score' => rand(1, 10),
                     ]);
                 }
