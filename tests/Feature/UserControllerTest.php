@@ -34,7 +34,11 @@ class UserControllerTest extends TestCase
             'username' => 'newuser',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'role' => 'judge'
+            'role' => 'judge',
+            'email' => 'newuser@gmail.com',
+            'first_name' => 'New',
+            'last_name' => 'User',
+            'role' => 'tabulator'
         ]);
 
         $response->assertStatus(201)
@@ -44,7 +48,7 @@ class UserControllerTest extends TestCase
 
         $this->assertDatabaseHas('users', [
             'username' => 'newuser',
-            'role' => 'judge'
+            'role' => 'tabulator'
         ]);
     }
 
@@ -66,7 +70,7 @@ class UserControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->getJson('/api/v1/users/' . $user->user_id);
+        $response = $this->actingAs($user)->getJson('/api/v1/user');
 
         $response->assertStatus(200)
             ->assertJson([
@@ -80,9 +84,9 @@ class UserControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->putJson('/api/v1/users/' . $user->user_id, [
+        $response = $this->patchJson('/api/v1/users/' . $user->user_id, [
             'username' => 'updateduser',
-            'role' => $user->role
+            'role' => 'tabulator',
         ]);
 
         $response->assertStatus(200)
@@ -102,11 +106,11 @@ class UserControllerTest extends TestCase
         $user = User::factory()->create();
         $oldPasswordHash = $user->password;
 
-        $response = $this->putJson('/api/v1/users/' . $user->user_id, [
+        $response = $this->patchJson('/api/v1/users/' . $user->user_id, [
             'username' => $user->username,
             'password' => 'newpassword123',
             'password_confirmation' => 'newpassword123',
-            'role' => $user->role
+            'role' => 'tabulator',
         ]);
 
         $response->assertStatus(200);
@@ -119,7 +123,11 @@ class UserControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->deleteJson('/api/v1/users/' . $user->user_id);
+        $requestData = [
+            'user_id' => $user->user_id,
+        ];
+
+        $response = $this->deleteJson('/api/v1/users/' . $user->user_id, $requestData);
 
         $response->assertStatus(204);
         $this->assertDatabaseMissing('users', [

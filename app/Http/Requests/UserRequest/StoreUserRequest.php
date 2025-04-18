@@ -37,7 +37,7 @@ class StoreUserRequest extends FormRequest
             'password' => 'required|min:8|string|confirmed|max:100',
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
-            'role' => 'required|in:Admin,Tabulator,Judge',
+            'role' => 'required|in:admin,tabulator,judge',
         ];
     }
 

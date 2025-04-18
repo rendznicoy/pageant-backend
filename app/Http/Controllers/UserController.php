@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UserRequest\ShowUserRequest;
 use Illuminate\Http\Request;
 use App\Http\Requests\UserRequest\StoreUserRequest;
 use App\Http\Requests\UserRequest\UpdateUserRequest;
@@ -33,23 +34,24 @@ class UserController extends Controller
 
     public function show(Request $request) 
     {
-        $validated = $request->validated();
+        /* $validated = $request->validated();
 
-        $user = User::where('user_id', $validated['user_id'])->firstOrFail();
+        $user = User::where('user_id', $validated['user_id'])->firstOrFail(); */
 
-        return response()->json(new UserResource($user), 200);
+        return new UserResource($request->user());
     }
 
-    public function update(UpdateUserRequest $request, User $user) 
+    public function update(UpdateUserRequest $request, $user_id) 
     {
-        $data = $request->validated();
-
-        if (isset($data['password'])) {
-            $data['password'] = bcrypt($data['password']);
+        $user = User::where('user_id', $user_id)->firstOrFail();
+        $validatedData = $request->validated();
+        
+        if (isset($validatedData['password'])) {
+            $validatedData['password'] = bcrypt($validatedData['password']);
         }
-
-        $user->update($data);
-
+        
+        $user->update($validatedData);
+        
         return response()->json([
             'message' => 'User updated successfully.',
             'user' => new UserResource($user),
