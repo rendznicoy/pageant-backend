@@ -17,34 +17,11 @@ use App\Models\Score;
 
 class EventController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $perPage = 12;
+        $events = Event::with('createdBy')->get();
 
-        $status = $request->query('status');
-        $search = $request->query('search');
-
-        $query = Event::query();
-
-        if ($status && $status !== 'all') {
-            $query->where('status', $status);
-        }
-
-        if ($search) {
-            $query->where('event_name', 'like', "%$search%");
-        }
-
-        $events = $query->orderBy('created_at', 'desc')->paginate($perPage);
-
-        return response()->json([
-            'data' => $events->items(),
-            'meta' => [
-                'current_page' => $events->currentPage(),
-                'per_page' => $events->perPage(),
-                'total' => $events->total(),
-                'last_page' => $events->lastPage(),
-            ]
-        ], 200);
+        return response()->json(EventResource::collection($events));
     }
 
     public function store(StoreEventRequest $request)

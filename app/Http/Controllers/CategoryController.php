@@ -13,28 +13,11 @@ use Illuminate\Support\Facades\Log;
 
 class CategoryController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, $event_id)
     {
-        $perPage = 12;
-        $eventId = $request->route('event_id') ?? $request->query('event_id');
+        $categories = Category::where('event_id', $event_id)->get();
 
-        $query = Category::query();
-
-        if ($eventId) {
-            $query->where('event_id', $eventId);
-        }
-
-        $categories = $query->orderBy('created_at', 'desc')->paginate($perPage);
-
-        return response()->json([
-            'data' => $categories->items(),
-            'meta' => [
-                'current_page' => $categories->currentPage(),
-                'per_page' => $categories->perPage(),
-                'total' => $categories->total(),
-                'last_page' => $categories->lastPage(),
-            ]
-        ], 200);
+        return response()->json(CategoryResource::collection($categories));
     }
 
     public function store(StoreCategoryRequest $request)

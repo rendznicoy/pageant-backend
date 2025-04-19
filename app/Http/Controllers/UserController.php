@@ -13,10 +13,17 @@ use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $user = UserResource::collection(User::all());
-        return response()->json($user, 200);
+        $query = User::query();
+
+        if ($request->has('role')) {
+            $query->where('role', $request->query('role'));
+        }
+
+        $users = $query->get();
+
+        return response()->json(UserResource::collection($users));
     }
 
     public function store(StoreUserRequest $request)

@@ -12,43 +12,17 @@ use App\Models\Candidate;
 
 class CandidateController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, $event_id)
     {
-        $perPage = 12;
+        $query = Candidate::where('event_id', $event_id);
 
-        $eventId = $request->query('event_id');
-        $sex = $request->query('sex');
-        $search = $request->query('search');
-
-        $query = Candidate::query();
-
-        if ($eventId) {
-            $query->where('event_id', $eventId);
+        if ($request->has('sex')) {
+            $query->where('sex', $request->query('sex'));
         }
 
-        if ($sex && $sex !== 'all') {
-            $query->where('sex', $sex);
-        }
+        $candidates = $query->get();
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'like', "%$search%")
-                ->orWhere('last_name', 'like', "%$search%")
-                ->orWhere('team', 'like', "%$search%");
-            });
-        }
-
-        $candidates = $query->orderBy('created_at', 'desc')->paginate($perPage);
-
-        return response()->json([
-            'data' => $candidates->items(),
-            'meta' => [
-                'current_page' => $candidates->currentPage(),
-                'per_page' => $candidates->perPage(),
-                'total' => $candidates->total(),
-                'last_page' => $candidates->lastPage(),
-            ]
-        ], 200);
+        return response()->json(CandidateResource::collection($candidates));
     }
 
     public function store(StoreCandidateRequest $request)

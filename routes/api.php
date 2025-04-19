@@ -29,7 +29,7 @@ Route::prefix('v1')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
 
     // Authenticated User Routes
-    Route::middleware([EnsureFrontendRequestsAreStateful::class, 'auth:sanctum'])->group(function () {
+    Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('users', [UserController::class, 'index']);
         Route::get('user', [UserController::class, 'show']);
@@ -39,7 +39,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Admin and Tabulator-only routes
-    Route::middleware(['auth:sanctum', 'role:admin,tabulator'])->group(function () {
+    Route::middleware(['auth:sanctum', 'role:Admin,Tabulator'])->group(function () {
 
         // Events
         Route::prefix('events')->group(function () {

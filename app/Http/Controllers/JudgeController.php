@@ -12,28 +12,11 @@ use App\Models\Judge;
 
 class JudgeController extends Controller
 {
-    public function index(Request $request)
+    public function index($event_id)
     {
-        $perPage = 12;
-        $eventId = $request->query('event_id');
+        $judges = Judge::with('user')->where('event_id', $event_id)->get();
 
-        $query = Judge::with('user');
-
-        if ($eventId) {
-            $query->where('event_id', $eventId);
-        }
-
-        $judges = $query->orderBy('created_at', 'desc')->paginate($perPage);
-
-        return response()->json([
-            'data' => $judges->items(),
-            'meta' => [
-                'current_page' => $judges->currentPage(),
-                'per_page' => $judges->perPage(),
-                'total' => $judges->total(),
-                'last_page' => $judges->lastPage(),
-            ]
-        ], 200);
+        return response()->json(JudgeResource::collection($judges));
     }
 
     public function store(StoreJudgeRequest $request)

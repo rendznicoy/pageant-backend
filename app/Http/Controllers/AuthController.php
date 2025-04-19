@@ -16,19 +16,17 @@ class AuthController extends Controller
     {
         $credentials = $request->validated();
 
-        $user = User::where('username', $credentials['username'])->first();
+        if (Auth::attempt($credentials)) {
+            $request->session()->regenerate();
 
-        if (! $user || ! Hash::check($credentials['password'], $user->password)) {
-            throw ValidationException::withMessages([
-                'username' => ['Invalid credentials.'],
+            return response()->json([
+                'message' => 'Login successful.',
+                'user' => Auth::user(), // freshly authenticated user
             ]);
         }
 
-        Auth::login($user); // Use Laravel's session-based login
-
-        return response()->json([
-            'message' => 'Login successful.',
-            'user' => $user
+        throw ValidationException::withMessages([
+            'username' => ['The provided credentials do not match our records.'],
         ]);
     }
 

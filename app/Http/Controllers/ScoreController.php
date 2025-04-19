@@ -15,20 +15,24 @@ class ScoreController extends Controller
 {
     public function index(Request $request, $event_id)
     {
-        $judgeId = $request->query('judge_id');
-        $candidateId = $request->query('candidate_id');
-        $categoryId = $request->query('category_id');
+        $query = Score::with(['event', 'judge.user', 'candidate', 'category'])
+                ->where('event_id', $event_id);
 
-        $query = Score::with(['judge.user', 'candidate', 'category', 'event'])
-                    ->where('event_id', $event_id); // from route
+        if ($request->has('judge_id')) {
+            $query->where('judge_id', $request->query('judge_id'));
+        }
 
-        if ($judgeId) $query->where('judge_id', $judgeId);
-        if ($candidateId) $query->where('candidate_id', $candidateId);
-        if ($categoryId) $query->where('category_id', $categoryId);
+        if ($request->has('candidate_id')) {
+            $query->where('candidate_id', $request->query('candidate_id'));
+        }
+
+        if ($request->has('category_id')) {
+            $query->where('category_id', $request->query('category_id'));
+        }
 
         $scores = $query->get();
 
-        return response()->json($scores, 200);
+        return response()->json(ScoreResource::collection($scores));
     }
 
     public function store(StoreScoreRequest $request)

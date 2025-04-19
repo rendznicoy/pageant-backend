@@ -282,6 +282,16 @@ class DatabaseSeeder extends Seeder
             'last_name' => 'User',
         ]);
 
+        // Create a test user you can log in with on Postman
+        $testUser = User::create([
+            'username' => 'AdminUser',
+            'email' => 'adminuser@example.com',
+            'password' => Hash::make('adminpassword'), // Must be hashed
+            'role' => 'admin', // or 'admin' depending on your logic
+            'first_name' => 'Admin',
+            'last_name' => 'User',
+        ]);
+
         // Create an event owned by test user
         $event = Event::factory()->active()->create([
             'created_by' => $testUser->user_id,
@@ -337,4 +347,18 @@ class DatabaseSeeder extends Seeder
             }
         }
     }
+
+    /* public function run(): void
+    {
+        // User::factory(10)->create();
+
+        User::factory()->create([
+            'first_name' => 'Test',
+            'last_name' => 'User',
+            'username' => 'testuser',
+            'password' => Hash::make('password'), // Must be hashed
+            'role' => 'tabulator', // or 'admin' depending on your logic
+            'email' => 'test@example.com',
+        ]);
+    } */
 }
