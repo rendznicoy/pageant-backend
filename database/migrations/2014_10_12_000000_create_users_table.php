@@ -12,14 +12,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
-            $table->id('user_id'); // Explicit PK
+            $table->bigIncrements('user_id');
+
             $table->string('username')->unique();
             $table->string('email')->unique();
-            $table->string('password');
+            $table->string('password')->nullable(); // Nullable for Google login or judges w/ pin_code
+
             $table->string('first_name');
             $table->string('last_name');
-            $table->enum('role', ['Admin', 'Tabulator', 'Judge']);
-            $table->rememberToken();
+
+            $table->enum('role', ['admin', 'tabulator', 'judge']);
+
             $table->timestamps();
         });
     }

@@ -11,6 +11,7 @@ use App\Models\Candidate;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -270,7 +271,7 @@ class DatabaseSeeder extends Seeder
         }
     } */
 
-    public function run(): void
+    /* public function run(): void
     {
         // Create a test user you can log in with on Postman
         $testUser = User::create([
@@ -306,8 +307,22 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Link first judge to test user for testing
+        $judgeUser = User::factory()->create([
+            'username' => 'JudgeUser',
+            'email' => 'judgeuser@example.com',
+            'password' => Hash::make('judgepassword'),
+            'role' => 'judge',
+            'first_name' => 'Judge',
+            'last_name' => 'User',
+        ]);
+
+        // Create judges and assign one to the judge user
+        $judges = Judge::factory()->count(5)->create([
+            'event_id' => $event->event_id,
+        ]);
+
         $judges->first()->update([
-            'user_id' => $testUser->user_id,
+            'user_id' => $judgeUser->user_id,
         ]);
 
         // Create categories linked to the event
@@ -346,7 +361,7 @@ class DatabaseSeeder extends Seeder
                 }
             }
         }
-    }
+    } */
 
     /* public function run(): void
     {
@@ -361,4 +376,92 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
         ]);
     } */
+
+    public function run(): void
+    {
+        // Create Admin and Tabulator users
+        $admin = User::create([
+            'username' => 'AdminUser',
+            'email' => 'admin@example.com',
+            'password' => Hash::make('adminpassword'),
+            'first_name' => 'Admin',
+            'last_name' => 'User',
+            'role' => 'admin',
+        ]);
+
+        $tabulator = User::create([
+            'username' => 'TabulatorUser',
+            'email' => 'tabulator@example.com',
+            'password' => Hash::make('tabulatorpassword'),
+            'first_name' => 'Tab',
+            'last_name' => 'User',
+            'role' => 'tabulator',
+        ]);
+
+        // Create Event
+        $event = Event::factory()->create([
+            'created_by' => $tabulator->user_id,
+            'status' => 'active',
+        ]);
+
+        // Create Judges — first as users
+        for ($i = 0; $i < 5; $i++) {
+            $user = User::create([
+                'username' => 'judge' . $i, // 👈 Add this line
+                'email' => "judge{$i}@example.com",
+                'first_name' => 'Judge' . $i,
+                'last_name' => 'Lastname' . $i,
+                'role' => 'judge',
+                'password' => null, // assuming login via pin_code
+            ]);
+
+            // Generate unique pin_code
+            do {
+                $pin = Str::random(6);
+            } while (Judge::where('pin_code', $pin)->exists());
+
+            Judge::create([
+                'event_id' => $event->event_id,
+                'user_id' => $user->user_id,
+                'pin_code' => $pin,
+            ]);
+        }
+
+        // Categories
+        $categories = Category::factory()->count(3)->create([
+            'event_id' => $event->event_id,
+        ]);
+
+        // Candidates
+        $candidateNumbers = range(1, 5);
+
+        $maleCandidates = collect($candidateNumbers)->map(fn ($num) =>
+            Candidate::factory()->male()->create([
+                'candidate_number' => $num,
+                'event_id' => $event->event_id,
+            ])
+        );
+
+        $femaleCandidates = collect($candidateNumbers)->map(fn ($num) =>
+            Candidate::factory()->female()->create([
+                'candidate_number' => $num,
+                'event_id' => $event->event_id,
+            ])
+        );
+
+        // Scores
+        $judges = Judge::all();
+        foreach ($judges as $judge) {
+            foreach ($categories as $category) {
+                foreach ($maleCandidates->concat($femaleCandidates) as $candidate) {
+                    Score::factory()->create([
+                        'judge_id' => $judge->judge_id,
+                        'candidate_id' => $candidate->candidate_id,
+                        'category_id' => $category->category_id,
+                        'score' => rand(1, 10),
+                    ]);
+                }
+            }
+        }
+    }
 }

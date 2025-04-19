@@ -39,7 +39,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Admin and Tabulator-only routes
-    Route::middleware(['auth:sanctum', 'role:Admin,Tabulator'])->group(function () {
+    Route::middleware(['auth:sanctum', 'role:admin,tabulator'])->group(function () {
 
         // Events
         Route::prefix('events')->group(function () {

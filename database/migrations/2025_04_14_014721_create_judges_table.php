@@ -12,9 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('judges', function (Blueprint $table) {
-            $table->id('judge_id');
+            $table->bigIncrements('judge_id');
+
+            // Link to user and event
             $table->foreignId('user_id')->constrained('users', 'user_id')->onDelete('cascade');
             $table->foreignId('event_id')->constrained('events', 'event_id')->onDelete('cascade');
+
+            // Unique PIN code for event access
+            $table->string('pin_code', 6)->unique();
+
             $table->timestamps();
         });
     }

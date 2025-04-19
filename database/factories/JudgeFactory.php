@@ -5,6 +5,7 @@ namespace Database\Factories;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use App\Models\User;
 use App\Models\Event;
+use Illuminate\Support\Str;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Judge>
@@ -19,8 +20,9 @@ class JudgeFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => User::factory()->state(['role' => 'Judge']),
-            'event_id' => Event::factory(),
+            'user_id' => null,
+            'event_id' => null,
+            'pin_code' => str_pad(random_int(100000, 999999), 6, '0', STR_PAD_LEFT),
         ];
     }
 }

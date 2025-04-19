@@ -26,10 +26,10 @@ class UserFactory extends Factory
         return [
             'username' => fake()->unique()->userName(),
             'email' => fake()->unique()->safeEmail(),
-            'password' => bcrypt('password'),
+            'password' => Hash::make('password'),
             'first_name' => fake()->firstName(),
             'last_name' => fake()->lastName(),
-            'role' => fake()->randomElement(['Admin', 'Tabulator', 'Judge']),
+            'role' => fake()->randomElement(['admin', 'tabulator']),
         ];
     }
 

@@ -16,6 +16,7 @@ class Judge extends Model
     protected $fillable = [
         'user_id',
         'event_id',
+        'pin_code',
     ];
 
     public function user()

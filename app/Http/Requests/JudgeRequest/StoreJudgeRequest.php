@@ -25,17 +25,10 @@ class StoreJudgeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'user_id' => [
-                'required',
-                'exists:users,user_id',
-                function ($attribute, $value, $fail) {
-                    $user = User::find($value);
-                    if (! $user || $user->role !== 'Judge') {
-                        $fail('The selected user is not a judge.');
-                    }
-                },
-            ],
             'event_id' => 'required|exists:events,event_id',
+            'email' => 'required|email|unique:users,email',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
         ];
     }
 
