@@ -17,13 +17,20 @@ class EventResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'event_id' => $this->event_id,
-            'event_name' => $this->event_name,
-            'event_code' => $this->event_code,
-            'start_date' => $this->start_date,
-            'end_date' => $this->end_date,
-            'status' => $this->status,
-            'created_by' => new UserResource($this->whenLoaded('creator')),
+            'event_id'    => $this->event_id,
+            'event_name'  => $this->event_name,
+            'event_code'  => $this->event_code,
+            'start_date'  => $this->start_date,
+            'end_date'    => $this->end_date,
+            'status'      => $this->status,
+
+            'created_by'  => $this->whenLoaded('createdBy', function () {
+                return [
+                    'user_id'   => $this->createdBy->user_id,
+                    'username'  => $this->createdBy->username,
+                    'role'      => $this->createdBy->role,
+                ];
+            }),
         ];
     }
 }

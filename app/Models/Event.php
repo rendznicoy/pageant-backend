@@ -22,9 +22,9 @@ class Event extends Model
         'created_by',
     ];
 
-    public function creator()
+    public function createdBy()
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by', 'user_id');
     }
 
     public function categories()
