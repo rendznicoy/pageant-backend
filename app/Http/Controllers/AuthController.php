@@ -9,13 +9,18 @@ use Illuminate\Validation\ValidationException;
 use App\Models\User;
 use App\Http\Requests\AuthRequest\LoginRequest;
 use App\Http\Requests\AuthRequest\RegisterRequest;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
     public function login(LoginRequest $request)
     {
-        $credentials = $request->only('username', 'password');
-        $remember = $request->boolean('remember'); // Convert to actual boolean
+        $validated = $request->only('username', 'password');
+
+        $remember = $validated['remember'] ?? false;
+
+        // Remove `remember` from the credentials before passing to attempt
+        $credentials = collect($validated)->except('remember')->toArray();
 
         if (Auth::attempt($credentials, $remember)) {
             $request->session()->regenerate();
@@ -48,8 +53,15 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
-        return response()->json(['message' => 'Logged out']);
+        return response()->json(['message' => 'Logged out']);/* ->withCookie(
+        cookie()->forget(config('session.cookie'))
+        ) */
+        /* Log::info('Logout triggered', [
+            'user_id' => auth()->id(),
+            'session_id' => session()->getId(),
+        ]); */
     }
 }
