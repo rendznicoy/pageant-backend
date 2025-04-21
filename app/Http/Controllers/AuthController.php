@@ -14,14 +14,15 @@ class AuthController extends Controller
 {
     public function login(LoginRequest $request)
     {
-        $credentials = $request->validated();
+        $credentials = $request->only('username', 'password');
+        $remember = $request->boolean('remember'); // Convert to actual boolean
 
-        if (Auth::attempt($credentials)) {
+        if (Auth::attempt($credentials, $remember)) {
             $request->session()->regenerate();
 
             return response()->json([
                 'message' => 'Login successful.',
-                'user' => Auth::user(), // freshly authenticated user
+                'user' => Auth::user(),
             ]);
         }
 
