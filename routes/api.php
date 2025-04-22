@@ -27,6 +27,7 @@ Route::prefix('v1')->group(function () {
     // Public Auth Routes
     Route::post('login', [AuthController::class, 'login']);
     Route::post('register', [AuthController::class, 'register']);
+    Route::post('password/forgot', [AuthController::class, 'forgotPassword']);
 
     // Authenticated User Routes
     Route::middleware(['auth:sanctum'])->group(function () {

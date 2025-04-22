@@ -10,6 +10,9 @@ use App\Models\User;
 use App\Http\Requests\AuthRequest\LoginRequest;
 use App\Http\Requests\AuthRequest\RegisterRequest;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -63,5 +66,49 @@ class AuthController extends Controller
             'user_id' => auth()->id(),
             'session_id' => session()->getId(),
         ]); */
+    }
+
+    public function forgotPassword(Request $request)
+    {
+        $data = $request->only('username', 'email');
+
+        $user = null;
+        if (!empty($data['username'])) {
+            $user = User::where('username', $data['username'])->first();
+        } elseif (!empty($data['email'])) {
+            $user = User::where('email', $data['email'])->first();
+        }
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        // Generate unique token
+        $token = Str::random(60);
+        
+        // Store the token with expiration time
+        DB::table('password_reset_tokens')->insert([
+            'email' => $user->email,
+            'token' => $token,
+            'created_at' => now()
+        ]);
+        
+        // Generate reset URL
+        $resetUrl = url(config('app.url') . '/reset-password/' . $token);
+        
+        // Send email to user
+        Mail::send('emails.password_reset', [
+            'user' => $user,
+            'resetUrl' => $resetUrl,
+            'token' => $token,
+        ], function ($message) use ($user) {
+            $message->to($user->email)
+                    ->subject('VSU Elearning Notification: Visayas State University E-Learning Environment: Password reset request');
+        });
+
+        return response()->json([
+            'message' => 'User found. Reset instructions have been sent to your email.',
+            'email' => $user->email, // This will be used by the frontend to display a message
+        ]);
     }
 }
