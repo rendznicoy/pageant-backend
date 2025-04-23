@@ -16,12 +16,15 @@ return new class extends Migration
 
             $table->string('username')->unique();
             $table->string('email')->unique();
+            $table->string('google_id')->nullable();
             $table->string('password')->nullable(); // Nullable for Google login or judges w/ pin_code
 
             $table->string('first_name');
             $table->string('last_name');
 
             $table->enum('role', ['admin', 'tabulator', 'judge']);
+
+            $table->timestamp('email_verified_at')->nullable();
 
             $table->timestamps();
         });

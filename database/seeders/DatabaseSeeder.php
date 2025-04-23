@@ -387,7 +387,7 @@ class DatabaseSeeder extends Seeder
             'last_name' => 'de los Reyes',
             'role' => 'admin',
         ]);
-        
+
         // Create Admin and Tabulator users
         $admin = User::create([
             'username' => 'AdminUser',
@@ -415,18 +415,20 @@ class DatabaseSeeder extends Seeder
 
         // Create Judges — first as users
         for ($i = 0; $i < 5; $i++) {
+            $username = 'judge' . $i;
+
             $user = User::create([
-                'username' => 'judge' . $i, // 👈 Add this line
+                'username' => $username,
                 'email' => "judge{$i}@example.com",
                 'first_name' => 'Judge' . $i,
                 'last_name' => 'Lastname' . $i,
                 'role' => 'judge',
-                'password' => null, // assuming login via pin_code
+                'password' => null,
             ]);
 
-            // Generate unique pin_code
+            // Generate unique, uppercase pin_code
             do {
-                $pin = Str::random(6);
+                $pin = strtoupper(Str::random(6));
             } while (Judge::where('pin_code', $pin)->exists());
 
             Judge::create([

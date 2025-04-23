@@ -26,8 +26,10 @@ class User extends Authenticatable
         'last_name',
         'username',
         'email',
+        'google_id',
         'password',
         'role',
+        'email_verified_at',
     ];
 
     protected $attributes = [

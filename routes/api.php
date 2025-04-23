@@ -28,6 +28,9 @@ Route::prefix('v1')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
     Route::post('register', [AuthController::class, 'register']);
     Route::post('password/forgot', [AuthController::class, 'forgotPassword']);
+    Route::post('login/judge', [AuthController::class, 'judgeLogin']);
+    Route::get('/auth/google/redirect',[AuthController::class, 'redirectToGoogle']);
+    Route::get('/auth/google/callback',[AuthController::class, 'handleGoogleCallback']);
 
     // Authenticated User Routes
     Route::middleware(['auth:sanctum'])->group(function () {

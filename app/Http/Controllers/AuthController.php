@@ -7,12 +7,17 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use App\Models\User;
+use App\Models\Judge;
 use App\Http\Requests\AuthRequest\LoginRequest;
 use App\Http\Requests\AuthRequest\RegisterRequest;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Seesion;
+use Symfony\Component\HttpFoundation\Response;
+use Laravel\Socialite\Facades\Socialite;
+use Exception;
 
 class AuthController extends Controller
 {
@@ -110,5 +115,84 @@ class AuthController extends Controller
             'message' => 'User found. Reset instructions have been sent to your email.',
             'email' => $user->email, // This will be used by the frontend to display a message
         ]);
+    }
+
+    public function judgeLogin(Request $request)
+    {
+        $request->validate([
+            'pin_code' => 'required|string',
+        ]);
+
+        $judge = Judge::where('pin_code', $request->pin_code)->first();
+
+        if (!$judge) {
+            return response()->json([
+                'message' => 'Invalid PIN code.'
+            ], 422);
+        }
+
+        $user = $judge->user;
+
+        Auth::login($user);
+
+        $request->session()->regenerate();
+
+        return response()->json([
+            'message' => 'Judge login successful',
+            'user' => $user
+        ]);
+    }
+
+    public function redirectToGoogle(Request $request)
+    {
+        // Redirect to Google for authentication
+        return Socialite::driver('google')->redirect();
+    }
+
+    public function handleGoogleCallback(Request $request)
+    {
+        try {
+            $googleUser = Socialite::driver('google')->user();
+
+            $email = strtolower($googleUser->email);
+
+            // Block non-VSU emails
+            if (!str_ends_with($email, '@vsu.edu.ph')) {
+                return redirect(env('FRONTEND_URL') . '/login/admin?error=only_vsu_emails');
+            }
+
+            // Check if user already exists (email match)
+            $existingUser = User::where('email', $email)->first();
+
+            if ($existingUser) {
+                // Update Google ID if missing and mark email verified
+                $existingUser->update([
+                    'google_id' => $googleUser->id,
+                    'email_verified_at' => now(),
+                ]);
+
+                Auth::login($existingUser);
+            } else {
+                // Create a new user with default role (tabulator)
+                $newUser = User::create([
+                    'first_name' => explode(' ', $googleUser->name)[0] ?? '',
+                    'last_name' => explode(' ', $googleUser->name)[1] ?? '',
+                    'username' => explode('@', $email)[0],
+                    'email' => $email,
+                    'google_id' => $googleUser->id,
+                    'password' => Hash::make(Str::random(12)),
+                    'role' => 'tabulator',
+                    'email_verified_at' => now(), // Verified immediately
+                ]);
+
+                Auth::login($newUser);
+            }
+
+            return redirect(env('FRONTEND_URL') . '/admin/dashboard');
+
+        } catch (Exception $e) {
+            Log::error('Google Login Error: ' . $e->getMessage());
+            return redirect(env('FRONTEND_URL') . '/login/admin?error=google_auth_failed');
+        }
     }
 }

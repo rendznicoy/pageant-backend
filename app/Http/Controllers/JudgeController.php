@@ -53,7 +53,7 @@ class JudgeController extends Controller
 
         // Generate unique pin_code
         do {
-            $pin = Str::random(6);
+            $pin = strtoupper(Str::random(6));
         } while (Judge::where('pin_code', $pin)->exists());
 
         // Create judge
