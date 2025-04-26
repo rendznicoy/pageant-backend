@@ -18,7 +18,7 @@ class CandidateFactory extends Factory
     public function definition(): array
     {
         return [
-            'event_id' => Event::factory(),
+            'event_id' => null, // ← DO NOT auto-create event here
             'candidate_number' => fake()->unique()->randomNumber(3),
             'first_name' => fake()->firstName(),
             'last_name' => fake()->lastName(),

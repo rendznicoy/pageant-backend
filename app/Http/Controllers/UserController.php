@@ -72,4 +72,29 @@ class UserController extends Controller
 
         return response()->json(['message' => 'User deleted successfully.'], 204);
     }
+
+    public function updateProfile(Request $request)
+    {
+        $user = auth()->user();
+
+        $data = $request->validate([
+            'first_name' => 'sometimes|string',
+            'last_name' => 'sometimes|string',
+            'profile_photo' => 'nullable|image|max:2048', // max 2MB
+        ]);
+
+        if ($request->hasFile('profile_photo')) {
+            $filename = time().'_'.$request->profile_photo->getClientOriginalName();
+            $request->profile_photo->move(public_path('uploads/profile_photos'), $filename);
+            $data['profile_photo'] = 'uploads/profile_photos/' . $filename;
+        }
+
+        User::update($data);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile updated successfully.',
+            'user' => $user,
+        ]);
+    }
 }

@@ -18,7 +18,7 @@ class CategoryFactory extends Factory
     public function definition(): array
     {
         return [
-            'event_id' => Event::factory(),
+            'event_id' => null,
             'category_name' => fake()->word(),
             'category_weight' => fake()->randomFloat(2, 10, 30),
             'max_score' => 10,

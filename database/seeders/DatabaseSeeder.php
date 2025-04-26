@@ -15,215 +15,6 @@ use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
-    /* *
-     * Seed the application's database.
-     */
-    /* public function run(): void
-    {
-        // Create admin + tabulator
-        $admin = User::factory()->create(['role' => 'Admin', 'email' => 'admin@example.com']);
-        $tabulator = User::factory()->create(['role' => 'Tabulator']);
-
-        // Create an event
-        $event = Event::factory()->create(['created_by' => $admin->user_id]);
-
-        // Judges (linked to event)
-        $judges = User::factory()->count(3)->state(['role' => 'Judge'])->create();
-        foreach ($judges as $judgeUser) {
-            Judge::factory()->create([
-                'user_id' => $judgeUser->user_id,
-                'event_id' => $event->event_id,
-            ]);
-        }
-
-        // Categories for the event
-        $categories = Category::factory()->count(3)->create(['event_id' => $event->event_id]);
-
-        // Candidates for the event
-        $candidates = Candidate::factory()->count(10)->create(['event_id' => $event->event_id]); */
-
-        /* // Explicit test for duplicate candidate number with different sex
-        $candidates = collect([
-            Candidate::create([
-                'event_id' => $event->event_id,
-                'candidate_number' => '1',
-                'first_name' => 'Juan',
-                'last_name' => 'Dela Cruz',
-                'sex' => 'male',
-                'team' => 'Gladiators',
-            ]),
-            Candidate::create([
-                'event_id' => $event->event_id,
-                'candidate_number' => '1',
-                'first_name' => 'Maria',
-                'last_name' => 'Santos',
-                'sex' => 'female',
-                'team' => 'Gladiators',
-            ]),
-        ]); */
-
-        /* // Scores
-        $judgeIDs = Judge::where('event_id', $event->event_id)->pluck('judge_id');
-        $categoryIDs = $categories->pluck('category_id');
-        $candidateIDs = $candidates->pluck('candidate_id');
-
-        foreach ($judgeIDs as $judge_id) {
-            foreach ($candidateIDs as $candidate_id) {
-                foreach ($categoryIDs as $category_id) {
-                    Score::create([
-                        'judge_id' => $judge_id,
-                        'candidate_id' => $candidate_id,
-                        'category_id' => $category_id,
-                        'score' => rand(1, 10),
-                    ]);
-                }
-            }
-        }   
-    } */
-
-/*     public function run(): void
-    {
-        // Create Admin & Tabulator
-        $admin = User::factory()->create([
-            'role' => 'Admin',
-            'email' => 'admin@example.com',
-            'username' => 'admin',
-        ]);
-
-        $tabulator = User::factory()->create([
-            'role' => 'Tabulator',
-            'email' => 'tab@example.com',
-            'username' => 'tabulator',
-        ]);
-
-        // Create 3 events: inactive, active, completed
-        $inactiveEvent = Event::factory()->create([
-            'event_name' => 'Mr. & Ms. Chill VSU',
-            'status' => 'inactive',
-            'created_by' => $admin->user_id,
-        ]);
-
-        $activeEvent = Event::factory()->create([
-            'event_name' => 'Mr. & Ms. Active VSU',
-            'status' => 'active',
-            'created_by' => $admin->user_id,
-        ]);
-
-        $completedEvent = Event::factory()->create([
-            'event_name' => 'Mr. & Ms. Completed VSU',
-            'status' => 'completed',
-            'created_by' => $admin->user_id,
-        ]);
-
-        // Create 3 judges for the active event
-        $judges = User::factory()->count(3)->state(['role' => 'Judge'])->create();
-        foreach ($judges as $judgeUser) {
-            Judge::factory()->create([
-                'user_id' => $judgeUser->user_id,
-                'event_id' => $activeEvent->event_id,
-            ]);
-        }
-
-        // Create judges for inactive and completed events
-        $inactiveJudges = User::factory()->count(2)->state(['role' => 'Judge'])->create();
-        foreach ($inactiveJudges as $user) {
-            Judge::factory()->create([
-                'user_id' => $user->user_id,
-                'event_id' => $inactiveEvent->event_id,
-            ]);
-        }
-
-        $completedJudges = User::factory()->count(2)->state(['role' => 'Judge'])->create();
-        foreach ($completedJudges as $user) {
-            Judge::factory()->create([
-                'user_id' => $user->user_id,
-                'event_id' => $completedEvent->event_id,
-            ]);
-        }
-
-        // Assign categories to the active event
-        $categories = Category::factory()->count(3)->create([
-            'event_id' => $activeEvent->event_id,
-        ]);
-
-        // Assign categories to the inactive event
-        $categories = Category::factory()->count(3)->create([
-            'event_id' => $inactiveEvent->event_id,
-        ]);
-
-        // Assign categories to the completed event
-        $categories = Category::factory()->count(3)->create([
-            'event_id' => $completedEvent->event_id,
-        ]);
-
-        // Insert duplicate candidate numbers (Gladiators Test)
-        $candidates = collect([
-            Candidate::create([
-                'event_id' => $activeEvent->event_id,
-                'candidate_number' => '1',
-                'first_name' => 'Juan',
-                'last_name' => 'Dela Cruz',
-                'sex' => 'male',
-                'team' => 'Gladiators',
-            ]),
-            Candidate::create([
-                'event_id' => $activeEvent->event_id,
-                'candidate_number' => '1',
-                'first_name' => 'Maria',
-                'last_name' => 'Santos',
-                'sex' => 'female',
-                'team' => 'Gladiators',
-            ]),
-            Candidate::create([
-                'event_id' => $activeEvent->event_id,
-                'candidate_number' => '2',
-                'first_name' => 'Jose',
-                'last_name' => 'Dela Peña',
-                'sex' => 'male',
-                'team' => 'Sphinx',
-            ]),
-            Candidate::create([
-                'event_id' => $activeEvent->event_id,
-                'candidate_number' => '2',
-                'first_name' => 'Mariana',
-                'last_name' => 'Santisima',
-                'sex' => 'female',
-                'team' => 'Sphinx',
-            ]),
-        ]);
-
-        // Seed scores for active event only
-        $activeJudges = Judge::where('event_id', $activeEvent->event_id)->pluck('judge_id');
-        $categoryIDs = $categories->pluck('category_id');
-        $candidateIDs = $candidates->pluck('candidate_id');
-
-        foreach ($activeJudges as $judge_id) {
-            foreach ($candidateIDs as $candidate_id) {
-                foreach ($categoryIDs as $category_id) {
-                    Score::updateOrCreate(
-                        [
-                            'judge_id' => $judge_id,
-                            'candidate_id' => $candidate_id,
-                            'category_id' => $category_id,
-                            'event_id' => $activeEvent->event_id,
-                        ],
-                        ['score' => rand(1, 10)]
-                    );
-                }
-            }
-        }
-
-        // Create candidates for the completed event, but don't seed scores
-        Candidate::factory()->count(5)->create([
-            'event_id' => $completedEvent->event_id,
-        ]);
-
-        // Create candidates for the inactive event, but don't seed scores
-        Candidate::factory()->count(5)->create([
-            'event_id' => $inactiveEvent->event_id,
-        ]);
-    } */
-
     /* public function run(): void
     {
         // Create an event and immediately retrieve it from the database to ensure we have the correct ID
@@ -379,16 +170,7 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
-        User::create([
-            'username' => 'rendzdelosreyes',
-            'email' => '21-1-01027@vsu.edu.ph',
-            'password' => Hash::make('psswd1234'),
-            'first_name' => 'Rene Angelo',
-            'last_name' => 'de los Reyes',
-            'role' => 'admin',
-        ]);
-
-        // Create Admin and Tabulator users
+        // Create fixed users
         $admin = User::create([
             'username' => 'AdminUser',
             'email' => 'admin@example.com',
@@ -407,18 +189,25 @@ class DatabaseSeeder extends Seeder
             'role' => 'tabulator',
         ]);
 
-        // Create Event
-        $event = Event::factory()->create([
-            'created_by' => $tabulator->user_id,
-            'status' => 'active',
-        ]);
+        // Create one event for each status
+        $eventStatuses = ['active', 'inactive', 'completed'];
+        $events = [];
 
-        // Create Judges — first as users
+        foreach ($eventStatuses as $status) {
+            $events[$status] = Event::factory()->create([
+                'status' => $status,
+                'created_by' => $tabulator->user_id,
+            ]);
+        }
+
+        // Use only the active event for the full scoring setup
+        $event = $events['active'];
+
+        // Create 5 judges for the active event
+        $judges = collect();
         for ($i = 0; $i < 5; $i++) {
-            $username = 'judge' . $i;
-
             $user = User::create([
-                'username' => $username,
+                'username' => 'judge' . $i,
                 'email' => "judge{$i}@example.com",
                 'first_name' => 'Judge' . $i,
                 'last_name' => 'Lastname' . $i,
@@ -426,47 +215,42 @@ class DatabaseSeeder extends Seeder
                 'password' => null,
             ]);
 
-            // Generate unique, uppercase pin_code
             do {
                 $pin = strtoupper(Str::random(6));
             } while (Judge::where('pin_code', $pin)->exists());
 
-            Judge::create([
-                'event_id' => $event->event_id,
+            $judges->push(Judge::create([
                 'user_id' => $user->user_id,
+                'event_id' => $event->event_id,
                 'pin_code' => $pin,
-            ]);
+            ]));
         }
 
-        // Categories
+        // Create 3 categories for the active event
         $categories = Category::factory()->count(3)->create([
             'event_id' => $event->event_id,
         ]);
 
-        // Candidates
-        $candidateNumbers = range(1, 5);
-
-        $maleCandidates = collect($candidateNumbers)->map(fn ($num) =>
-            Candidate::factory()->male()->create([
+        // Create 5 male and 5 female candidates
+        $candidates = collect();
+        foreach (range(1, 5) as $num) {
+            $candidates->push(Candidate::factory()->male()->create([
                 'candidate_number' => $num,
                 'event_id' => $event->event_id,
-            ])
-        );
-
-        $femaleCandidates = collect($candidateNumbers)->map(fn ($num) =>
-            Candidate::factory()->female()->create([
+            ]));
+            $candidates->push(Candidate::factory()->female()->create([
                 'candidate_number' => $num,
                 'event_id' => $event->event_id,
-            ])
-        );
+            ]));
+        }
 
-        // Scores
-        $judges = Judge::all();
+        // Create scores for each combination
         foreach ($judges as $judge) {
             foreach ($categories as $category) {
-                foreach ($maleCandidates->concat($femaleCandidates) as $candidate) {
-                    Score::factory()->create([
+                foreach ($candidates as $candidate) {
+                    Score::create([
                         'judge_id' => $judge->judge_id,
+                        'event_id' => $event->event_id,
                         'candidate_id' => $candidate->candidate_id,
                         'category_id' => $category->category_id,
                         'score' => rand(1, 10),

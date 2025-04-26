@@ -21,10 +21,10 @@ class ScoreFactory extends Factory
     public function definition(): array
     {
         return [
-            'event_id' => Event::factory(),
-            'judge_id' => Judge::factory(),
-            'candidate_id' => Candidate::factory(),
-            'category_id' => Category::factory(),
+            'event_id' => null,
+            'judge_id' => null,
+            'candidate_id' => null,
+            'category_id' => null,
             'score' => fake()->numberBetween(1, 10),
         ];
     }
