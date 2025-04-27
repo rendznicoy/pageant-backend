@@ -24,6 +24,8 @@ class EventFactory extends Factory
             'end_date' => fake()->dateTimeBetween('+6 months', '+1 year'),
             'status' => fake()->randomElement(['inactive', 'active', 'completed']),
             'created_by' => User::factory(),
+            'last_accessed' => fake()->optional()->dateTimeBetween('-6 months', 'now'),
+            'is_starred' => false,
         ];
     }
 
