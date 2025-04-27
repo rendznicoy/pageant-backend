@@ -18,6 +18,8 @@ return new class extends Migration
             $table->date('start_date');
             $table->date('end_date');
             $table->enum('status', ['inactive', 'active', 'completed'])->default('inactive');
+            $table->timestamp('last_accessed')->nullable();
+            $table->boolean('is_starred')->default(false);
             $table->foreignId('created_by')->constrained('users', 'user_id')->onDelete('cascade');
             $table->timestamps();
         });
