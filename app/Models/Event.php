@@ -20,6 +20,8 @@ class Event extends Model
         'end_date',
         'status',
         'created_by',
+        'last_accessed',
+        'is_starred',
     ];
 
     public function createdBy()
