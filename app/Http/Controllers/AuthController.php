@@ -14,8 +14,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Seesion;
-use Symfony\Component\HttpFoundation\Response;
 use Laravel\Socialite\Facades\Socialite;
 use Exception;
 
@@ -75,45 +73,50 @@ class AuthController extends Controller
 
     public function forgotPassword(Request $request)
     {
-        $data = $request->only('username', 'email');
+        $request->validate([
+            'username' => 'required_without:email|string',
+            'email' => 'required_without:username|email'
+        ]);
 
-        $user = null;
-        if (!empty($data['username'])) {
-            $user = User::where('username', $data['username'])->first();
-        } elseif (!empty($data['email'])) {
-            $user = User::where('email', $data['email'])->first();
-        }
+        $user = User::when($request->username, function($query) use ($request) {
+                    return $query->where('username', $request->username);
+                })
+                ->when($request->email, function($query) use ($request) {
+                    return $query->where('email', $request->email);
+                })
+                ->first();
 
         if (!$user) {
-            return response()->json(['message' => 'User not found.'], 404);
+            return response()->json(['message' => 'User not found.'], 422);
         }
 
         // Generate unique token
         $token = Str::random(60);
         
         // Store the token with expiration time
-        DB::table('password_reset_tokens')->insert([
-            'email' => $user->email,
-            'token' => $token,
-            'created_at' => now()
-        ]);
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $user->email],
+            [
+                'token' => $token, 
+                'created_at' => now()
+            ]
+        );
         
         // Generate reset URL
-        $resetUrl = url(config('app.url') . '/reset-password/' . $token);
+        $resetUrl = url(config('app.frontend_url') . '/reset-password?token=' . $token);
         
         // Send email to user
         Mail::send('emails.password_reset', [
             'user' => $user,
-            'resetUrl' => $resetUrl,
-            'token' => $token,
+            'resetUrl' => $resetUrl
         ], function ($message) use ($user) {
             $message->to($user->email)
-                    ->subject('VSU Elearning Notification: Visayas State University E-Learning Environment: Password reset request');
+                    ->subject('Password Reset Request');
         });
 
         return response()->json([
-            'message' => 'User found. Reset instructions have been sent to your email.',
-            'email' => $user->email, // This will be used by the frontend to display a message
+            'message' => 'Reset link sent to your email',
+            'email' => $user->email
         ]);
     }
 
@@ -122,58 +125,75 @@ class AuthController extends Controller
         $request->validate([
             'pin_code' => 'required|string',
         ]);
-
         $judge = Judge::where('pin_code', $request->pin_code)->first();
-
         if (!$judge) {
-            return response()->json([
-                'message' => 'Invalid PIN code.'
-            ], 422);
+            return response()->json(['message' => 'Invalid PIN code.'], 422);
         }
-
         $user = $judge->user;
-
+        if (!$user) {
+            Log::error("No user associated with judge", ['judge_id' => $judge->id]);
+            return response()->json(['message' => 'No user account found for this judge.'], 422);
+        }
         Auth::login($user);
-
         $request->session()->regenerate();
-
+        $token = $user->createToken('judge-token')->plainTextToken;
+        Log::info("Judge login successful", [
+            'user_id' => $user->user_id ?? 'null',
+            'email' => $user->email,
+            'username' => $user->username,
+            'role' => $user->role,
+            'token' => $token
+        ]);
         return response()->json([
             'message' => 'Judge login successful',
-            'user' => $user
+            'user' => [
+                'user_id' => $user->user_id,
+                'email' => $user->email,
+                'username' => $user->username,
+                'role' => $user->role
+            ],
+            'token' => $token
         ]);
     }
 
     public function redirectToGoogle(Request $request)
     {
-        // Redirect to Google for authentication
-        return Socialite::driver('google')->redirect();
+        try {
+            // Try/catch to catch any configuration issues
+            return Socialite::driver('google')->redirect();
+        } catch (\Exception $e) {
+            // Return a user-friendly error
+            return redirect()->route('/login/admin')->with('error', 'Unable to connect to Google. Please try again later.');
+        }
     }
 
     public function handleGoogleCallback(Request $request)
     {
         try {
             $googleUser = Socialite::driver('google')->user();
-
-            $email = strtolower($googleUser->email);
+            $email = strtolower($googleUser->getEmail());
 
             // Block non-VSU emails
             if (!str_ends_with($email, '@vsu.edu.ph')) {
-                return redirect(env('FRONTEND_URL') . '/login/admin?error=only_vsu_emails');
+                return redirect(env('FRONTEND_URL', 'http://localhost:5173') . '/login/admin?error=only_vsu_emails');
             }
 
-            // Check if user already exists (email match)
+            // Determine role
+            $role = $email === '21-1-01027@vsu.edu.ph' ? 'admin' : 'tabulator';
+
+            // Check if user already exists
             $existingUser = User::where('email', $email)->first();
 
             if ($existingUser) {
-                // Update Google ID if missing and mark email verified
+                // Update Google ID, role, and mark email verified
                 $existingUser->update([
                     'google_id' => $googleUser->id,
+                    'role' => $role,
                     'email_verified_at' => now(),
                 ]);
-
                 Auth::login($existingUser);
             } else {
-                // Create a new user with default role (tabulator)
+                // Create new user
                 $newUser = User::create([
                     'first_name' => explode(' ', $googleUser->name)[0] ?? '',
                     'last_name' => explode(' ', $googleUser->name)[1] ?? '',
@@ -181,18 +201,24 @@ class AuthController extends Controller
                     'email' => $email,
                     'google_id' => $googleUser->id,
                     'password' => Hash::make(Str::random(12)),
-                    'role' => 'tabulator',
-                    'email_verified_at' => now(), // Verified immediately
+                    'role' => $role,
+                    'email_verified_at' => now(),
                 ]);
-
                 Auth::login($newUser);
             }
 
-            return redirect(env('FRONTEND_URL') . '/admin/dashboard');
+            // Use a hardcoded frontend URL temporarily to test if env() is the issue
+            $frontendUrl = 'http://localhost:5173';
+            
+            // Construct redirect path
+            $redirectPath = $role === 'admin' ? '/admin/dashboard' : '/tabulator/dashboard';
+            
+            // Return explicit redirect
+            return redirect($frontendUrl . $redirectPath);
 
-        } catch (Exception $e) {
-            Log::error('Google Login Error: ' . $e->getMessage());
-            return redirect(env('FRONTEND_URL') . '/login/admin?error=google_auth_failed');
+        } catch (\Exception $e) {
+            // Redirect with hardcoded URL to avoid env() issues
+            return redirect('http://localhost:5173/login/admin?error=google_auth_failed');
         }
     }
 }

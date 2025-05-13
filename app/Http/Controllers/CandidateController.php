@@ -12,17 +12,13 @@ use App\Models\Candidate;
 
 class CandidateController extends Controller
 {
-    public function index(Request $request, $event_id)
-    {
+    public function index(Request $request, $event_id) {
         $query = Candidate::where('event_id', $event_id);
-
         if ($request->has('sex')) {
             $query->where('sex', $request->query('sex'));
         }
-
         $candidates = $query->get();
-
-        return response()->json(CandidateResource::collection($candidates));
+        return response()->json(['data' => CandidateResource::collection($candidates)]);
     }
 
     public function store(StoreCandidateRequest $request)

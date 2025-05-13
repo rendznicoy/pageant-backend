@@ -34,6 +34,7 @@ class ShowCategoryRequest extends FormRequest
         return [
             'category_id' => 'required|exists:categories,category_id',
             'event_id' => 'required|exists:events,event_id',
+            'stage_id' => 'required|exists:stages,stage_id',
         ];
     }
 

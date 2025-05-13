@@ -23,9 +23,7 @@ class DestroyUserRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'user_id' => 'required|exists:users,user_id',
-        ];
+        return [];
     }
 
     protected function failedValidation(Validator $validator)

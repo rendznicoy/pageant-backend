@@ -26,6 +26,7 @@ class UpdateCategoryRequest extends FormRequest
         return [
             'category_id' => 'required|exists:categories,category_id',
             'event_id' => 'required|exists:events,event_id',
+            'stage_id' => 'sometimes|exists:stages,stage_id',
             'category_name' => 'sometimes|string|max:50',
             'category_weight' => 'sometimes|integer|min:0|max:100',
             'max_score' => 'sometimes|integer|min:1|max:10',

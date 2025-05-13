@@ -3,6 +3,9 @@
 namespace App\Http\Requests\EventRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Facades\Log;
 
 class ShowEventRequest extends FormRequest
 {
@@ -11,11 +14,19 @@ class ShowEventRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        $user = auth()->user();
+        $isAuthorized = $user && in_array($user->role, ['admin', 'tabulator']);
+        if (!$isAuthorized) {
+            Log::warning('Unauthorized attempt to view event', [
+                'user_id' => $user?->user_id,
+                'role' => $user?->role,
+                'event_id' => $this->route('event_id'),
+            ]);
+        }
+        return $isAuthorized;
     }
 
-    
-    protected function prepareForValidation()
+    protected function prepareForValidation(): void
     {
         $this->merge([
             'event_id' => $this->route('event_id'),
@@ -24,13 +35,20 @@ class ShowEventRequest extends FormRequest
 
     /**
      * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
             'event_id' => 'required|exists:events,event_id',
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Show event request failed validation.',
+            'errors' => $validator->errors(),
+        ], 422));
     }
 }

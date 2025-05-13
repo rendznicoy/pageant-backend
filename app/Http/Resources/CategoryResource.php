@@ -17,11 +17,16 @@ class CategoryResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'category_id' => $this->category_id,
+            'id' => $this->category_id,
             'event_id' => $this->event_id,
-            'category_name' => $this->category_name,
-            'category_weight' => $this->category_weight,
+            'stage_id' => $this->stage_id,
+            'name' => $this->category_name,
+            'weight' => $this->category_weight,
             'max_score' => $this->max_score,
+            'status' => $this->status,
+            'current_candidate_id' => $this->current_candidate_id,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
     }
 }

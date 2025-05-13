@@ -65,11 +65,20 @@ class UserController extends Controller
         ]);
     }
 
-    public function destroy(DestroyUserRequest $request, $id) 
+    public function destroy(DestroyUserRequest $request, $user_id)
     {
-        $user = User::findOrFail($id);
+        $user = User::where('user_id', $user_id)->firstOrFail();
+        
+        if ($user->user_id === auth()->user()->user_id) {
+            return response()->json(['message' => 'Cannot delete self'], 422);
+        }
+        
+        if ($user->events()->exists() || $user->judge()->exists()) {
+            return response()->json(['message' => 'User has associated events or judge profile'], 422);
+        }
+        
         $user->delete();
-
+        
         return response()->json(['message' => 'User deleted successfully.'], 204);
     }
 
@@ -95,6 +104,46 @@ class UserController extends Controller
             'success' => true,
             'message' => 'Profile updated successfully.',
             'user' => $user,
+        ]);
+    }
+
+    public function bulkDelete(Request $request)
+    {
+        $request->validate([
+            'user_ids' => 'required|array|min:1',
+            'user_ids.*' => 'exists:users,user_id',
+        ]);
+
+        $failed = [];
+        $success = [];
+        $currentUserId = auth()->user()->user_id;
+
+        foreach ($request->user_ids as $user_id) {
+            try {
+                $user = User::where('user_id', $user_id)->firstOrFail();
+                if ($user->user_id === $currentUserId) {
+                    $failed[] = ['id' => $user_id, 'message' => 'Cannot delete self'];
+                    continue;
+                }
+                if ($user->events()->exists() || $user->judge()->exists()) {
+                    $failed[] = ['id' => $user_id, 'message' => 'User has associated events or judge profile'];
+                    continue;
+                }
+                $user->delete();
+                $success[] = $user_id;
+            } catch (\Exception $e) {
+                $failed[] = ['id' => $user_id, 'message' => $e->getMessage()];
+            }
+        }
+
+        if (count($failed) === count($request->user_ids)) {
+            return response()->json(['message' => 'Failed to delete all users', 'failed' => $failed], 422);
+        }
+
+        return response()->json([
+            'message' => count($failed) ? 'Some users deleted successfully' : 'All users deleted successfully',
+            'success' => $success,
+            'failed' => $failed,
         ]);
     }
 }

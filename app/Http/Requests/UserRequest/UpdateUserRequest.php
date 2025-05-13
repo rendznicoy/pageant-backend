@@ -29,7 +29,7 @@ class UpdateUserRequest extends FormRequest
             'password' => 'sometimes|string|min:8|max:100',
             'first_name' => 'sometimes|string|max:255',
             'last_name' => 'sometimes|string|max:255',
-            'role' => 'sometimes|in:admin,tabulator,judge',
+            'role' => 'sometimes|in:admin,tabulator',
         ];
     }
 

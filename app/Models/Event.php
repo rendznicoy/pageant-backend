@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class Event extends Model
 {
@@ -22,7 +23,47 @@ class Event extends Model
         'created_by',
         'last_accessed',
         'is_starred',
+        'cover_photo',
+        'description',
     ];
+
+    protected $casts = [
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
+        'last_accessed' => 'datetime',
+    ];
+
+    // Add accessors to format dates correctly for API responses
+    // This ensures dates are returned with timezone information
+    public function getStartDateAttribute($value)
+    {
+        return $value ? Carbon::parse($value)->toISOString() : null;
+    }
+
+    public function getEndDateAttribute($value)
+    {
+        return $value ? Carbon::parse($value)->toISOString() : null;
+    }
+
+    public function getCreatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->toISOString();
+    }
+
+    public function getUpdatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->toISOString();
+    }
+
+    public function getLastAccessedAttribute($value)
+    {
+        return $value ? Carbon::parse($value)->toISOString() : null;
+    }
+
+    // Relationships
 
     public function createdBy()
     {
@@ -42,5 +83,15 @@ class Event extends Model
     public function judges()
     {
         return $this->hasMany(Judge::class, 'event_id');
+    }
+
+    public function stages()
+    {
+        return $this->hasMany(Stage::class, 'event_id');
+    }
+
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        return $date->format('Y-m-d\TH:i:s.u\Z'); // ISO8601 format with UTC timezone
     }
 }

@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class RoleMiddleware
 {
@@ -16,12 +17,28 @@ class RoleMiddleware
      */
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        $user = Auth::user();
+        $user = auth()->user();
+        if (!$user) {
+            Log::error("No authenticated user in RoleMiddleware", [
+                'path' => $request->path(),
+                'roles' => $roles,
+                'auth_check' => auth()->check(),
+            ]);
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
 
-        if ($user && in_array($user->role, $roles)) {
+        Log::info("RoleMiddleware executed", [
+            'path' => $request->path(),
+            'roles' => $roles,
+            'user_role' => $user->role,
+            'user_id' => $user->user_id,
+            'auth_check' => auth()->check(),
+        ]);
+
+        if (in_array($user->role, $roles)) {
             return $next($request);
         }
 
-        return response()->json(['error' => 'Unauthorized. Insufficient role access.'], 403);
+        return response()->json(['message' => 'Unauthorized'], 403);
     }
 }

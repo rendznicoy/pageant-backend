@@ -12,6 +12,7 @@ class Score extends Model
     protected $table = 'scores';
 
     public $incrementing = false; // Required for composite PK
+    
     protected $primaryKey = [
         'judge_id', 
         'candidate_id', 

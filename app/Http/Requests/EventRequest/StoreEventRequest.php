@@ -1,43 +1,47 @@
 <?php
-
 namespace App\Http\Requests\EventRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Facades\Log;
 
 class StoreEventRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        return true;
+        $user = auth()->user();
+        $isAuthorized = $user && in_array($user->role, ['admin', 'tabulator']);
+        if (!$isAuthorized) {
+            Log::warning('Unauthorized attempt to create event', [
+                'user_id' => $user?->user_id,
+                'role' => $user?->role,
+            ]);
+        }
+        return $isAuthorized;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
-            'event_name' => 'required|string|max:50',
-            'event_code' => 'required|string|unique:events,event_code',
-            'start_date' => 'required|date|date_format:Y-m-d',
-            'end_date' => 'required|date|date_format:Y-m-d|after_or_equal:start_date',
-            'status' => 'required|in:inactive,active,completed',
-            'created_by' => 'required|exists:users,user_id',
+            'event_name' => 'required|string|max:255',
+            'event_code' => 'required|string|max:255|unique:events,event_code',
+            'start_date' => 'required|date_format:Y-m-d H:i:s',
+            'end_date' => 'required|date_format:Y-m-d H:i:s|after_or_equal:start_date',
+            'description' => 'nullable|string',
+            'cover_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
         ];
     }
 
     protected function failedValidation(Validator $validator)
     {
+        Log::error('Create event validation failed', [
+            'errors' => $validator->errors()->all(),
+            'input' => $this->all(),
+        ]);
         throw new HttpResponseException(response()->json([
             'success' => false,
-            'message' => 'Validation failed.',
+            'message' => 'Create event request failed validation.',
             'errors' => $validator->errors(),
         ], 422));
     }

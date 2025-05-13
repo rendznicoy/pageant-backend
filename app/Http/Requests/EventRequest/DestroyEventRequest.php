@@ -5,6 +5,7 @@ namespace App\Http\Requests\EventRequest;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Facades\Log;
 
 class DestroyEventRequest extends FormRequest
 {
@@ -13,21 +14,27 @@ class DestroyEventRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        $user = auth()->user();
+        $isAuthorized = $user && in_array($user->role, ['admin', 'tabulator']);
+        if (!$isAuthorized) {
+            Log::warning('Unauthorized attempt to delete event', [
+                'user_id' => $user?->user_id,
+                'role' => $user?->role,
+                'event_id' => $this->route('event_id'),
+            ]);
+        }
+        return $isAuthorized;
     }
 
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'candidate_id' => $this->candidate_id,
-            'event_id' => $this->event_id,
+            'event_id' => $this->route('event_id'),
         ]);
     }
 
     /**
      * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -40,7 +47,7 @@ class DestroyEventRequest extends FormRequest
     {
         throw new HttpResponseException(response()->json([
             'success' => false,
-            'message' => 'Failed to validate event deletion.',
+            'message' => 'Delete event request failed validation.',
             'errors' => $validator->errors(),
         ], 422));
     }

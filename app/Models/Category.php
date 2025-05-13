@@ -15,9 +15,12 @@ class Category extends Model
 
     protected $fillable = [
         'event_id',
+        'stage_id',
         'category_name',
         'category_weight',
         'max_score',
+        'status', // Add status to fillable
+        'current_candidate_id',
     ];
 
     protected $casts = [
@@ -30,8 +33,18 @@ class Category extends Model
         return $this->belongsTo(Event::class, 'event_id');
     }
 
+    public function stage()
+    {
+        return $this->belongsTo(Stage::class, 'stage_id');
+    }
+
     public function scores()
     {
         return $this->hasMany(Score::class, 'category_id');
+    }
+
+    public function currentCandidate()
+    {
+        return $this->belongsTo(Candidate::class, 'current_candidate_id');
     }
 }

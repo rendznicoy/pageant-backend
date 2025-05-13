@@ -10,6 +10,7 @@ use App\Http\Controllers\CandidateController;
 use App\Http\Controllers\JudgeController;
 use App\Http\Controllers\ScoreController;
 use App\Http\Controllers\PdfReportController;
+use App\Http\Controllers\StageController;
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
 /*
@@ -23,14 +24,13 @@ use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 */
 
 Route::prefix('v1')->group(function () {
-
     // Public Auth Routes
     Route::post('login', [AuthController::class, 'login']);
     Route::post('register', [AuthController::class, 'register']);
     Route::post('password/forgot', [AuthController::class, 'forgotPassword']);
     Route::post('login/judge', [AuthController::class, 'judgeLogin']);
-    Route::get('/auth/google/redirect',[AuthController::class, 'redirectToGoogle']);
-    Route::get('/auth/google/callback',[AuthController::class, 'handleGoogleCallback']);
+    Route::get('/auth/google/redirect', [AuthController::class, 'redirectToGoogle']);
+    Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
 
     // Authenticated User Routes
     Route::middleware(['auth:sanctum'])->group(function () {
@@ -44,7 +44,6 @@ Route::prefix('v1')->group(function () {
 
     // Admin and Tabulator-only routes
     Route::middleware(['auth:sanctum', 'role:admin,tabulator'])->group(function () {
-
         // Events
         Route::prefix('events')->group(function () {
             Route::post('create', [EventController::class, 'store']);
@@ -52,25 +51,38 @@ Route::prefix('v1')->group(function () {
             Route::get('{event_id}', [EventController::class, 'show']);
             Route::patch('{event_id}/edit', [EventController::class, 'update']);
             Route::delete('{event_id}', [EventController::class, 'destroy']);
-
-            // Event status actions
             Route::post('{event_id}/start', [EventController::class, 'start']);
             Route::post('{event_id}/finalize', [EventController::class, 'finalize']);
             Route::post('{event_id}/reset', [EventController::class, 'reset']);
 
-            // Nested resources within an event
             Route::prefix('{event_id}')->group(function () {
+                Route::prefix('stages')->group(function () {
+                    Route::get('/', [StageController::class, 'index']);
+                    Route::post('/create', [StageController::class, 'store']);
+                    Route::get('/{stage_id}', [StageController::class, 'show']);
+                    Route::patch('/{stage_id}/edit', [StageController::class, 'update']);
+                    Route::delete('/{stage_id}', [StageController::class, 'destroy']);
+                    Route::post('/{stage_id}/start', [StageController::class, 'start']);
+                    Route::post('/{stage_id}/finalize', [StageController::class, 'finalize']);
+                    Route::post('/{stage_id}/reset', [StageController::class, 'reset']);
+                    Route::post('/{stage_id}/select-top-candidates', [StageController::class, 'selectTopCandidates']);
+                    Route::get('/{stage_id}/partial-results', [StageController::class, 'partialResults']);
+                });
 
-                // Categories
                 Route::prefix('categories')->group(function () {
+                    Route::get('pending-scores', [CategoryController::class, 'hasPendingScoresForAll']);
                     Route::get('/', [CategoryController::class, 'index']);
                     Route::post('create', [CategoryController::class, 'store']);
                     Route::get('{category_id}', [CategoryController::class, 'show']);
                     Route::patch('{category_id}/edit', [CategoryController::class, 'update']);
                     Route::delete('{category_id}', [CategoryController::class, 'destroy']);
+                    Route::post('{category_id}/start', [CategoryController::class, 'start']);
+                    Route::post('{category_id}/finalize', [CategoryController::class, 'finalize']);
+                    Route::post('{category_id}/reset', [CategoryController::class, 'reset']);
+                    Route::post('{category_id}/set-candidate', [CategoryController::class, 'setCandidate']);
+                    Route::get('{category_id}/pending-scores', [CategoryController::class, 'hasPendingScores']);
                 });
 
-                // Candidates
                 Route::prefix('candidates')->group(function () {
                     Route::get('/', [CandidateController::class, 'index']);
                     Route::post('create', [CandidateController::class, 'store']);
@@ -79,7 +91,6 @@ Route::prefix('v1')->group(function () {
                     Route::delete('{candidate_id}', [CandidateController::class, 'destroy']);
                 });
 
-                // Judges
                 Route::prefix('judges')->group(function () {
                     Route::get('/', [JudgeController::class, 'index']);
                     Route::post('create', [JudgeController::class, 'store']);
@@ -88,7 +99,6 @@ Route::prefix('v1')->group(function () {
                     Route::delete('{judge_id}', [JudgeController::class, 'destroy']);
                 });
 
-                // Scores
                 Route::prefix('scores')->group(function () {
                     Route::get('/', [ScoreController::class, 'index']);
                     Route::post('create', [ScoreController::class, 'store']);
@@ -97,9 +107,20 @@ Route::prefix('v1')->group(function () {
                     Route::delete('delete', [ScoreController::class, 'destroy']);
                 });
 
-                // PDF Report
                 Route::get('report', [PdfReportController::class, 'download']);
+                Route::get('results/preview', [PdfReportController::class, 'preview']);
             });
+        });
+    });
+
+    // Judge-only routes
+    Route::middleware(['auth:sanctum', 'role:judge'])->group(function () {
+        Route::prefix('judge')->group(function () {
+            Route::get('current-session', [JudgeController::class, 'currentSession']);
+            Route::get('scoring-session', [JudgeController::class, 'scoringSession']);
+            Route::post('submit-score', [ScoreController::class, 'submit']);
+            Route::post('confirm-score', [ScoreController::class, 'confirm']);
+            Route::get('final-results', [ScoreController::class, 'finalResults']);
         });
     });
 });

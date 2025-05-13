@@ -22,6 +22,7 @@ class Candidate extends Model
         'sex',
         'team',
         'photo',
+        'is_active',
     ];
 
     protected $cast = [

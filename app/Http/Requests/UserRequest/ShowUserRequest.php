@@ -21,8 +21,13 @@ class ShowUserRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'user_id' => 'required|exists:users,user_id',
+            return [
+            'username' => 'required|min:3|regex:/^[a-zA-Z0-9_-]+$/|unique:users',
+            'email' => 'required|email|unique:users',
+            'password' => 'required|min:8|regex:/^(?=.*[a-zA-Z])(?=.*[0-9])/|confirmed',
+            'first_name' => 'required|min:2|regex:/^[a-zA-Z\s]+$/',
+            'last_name' => 'required|min:2|regex:/^[a-zA-Z\s]+$/',
+            'role' => 'required|in:admin,tabulator',
         ];
     }
 }

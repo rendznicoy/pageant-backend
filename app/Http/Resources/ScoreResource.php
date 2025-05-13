@@ -22,6 +22,8 @@ class ScoreResource extends JsonResource
             'candidate_id' => $this->candidate_id,
             'category_id' => $this->category_id,
             'score' => $this->score,
+            'comments' => $this->comments,
+            'status' => $this->status,
             'event' => new EventResource($this->whenLoaded('event')),
             'judge' => new JudgeResource($this->whenLoaded('judge')),
             'candidate' => new CandidateResource($this->whenLoaded('candidate')),

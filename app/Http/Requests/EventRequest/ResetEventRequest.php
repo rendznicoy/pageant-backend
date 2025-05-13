@@ -5,15 +5,22 @@ namespace App\Http\Requests\EventRequest;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Facades\Log;
 
 class ResetEventRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        return true;
+        $user = auth()->user();
+        $isAuthorized = $user && in_array($user->role, ['admin', 'tabulator']);
+        if (!$isAuthorized) {
+            Log::warning('Unauthorized attempt to reset event', [
+                'user_id' => $user?->user_id,
+                'role' => $user?->role,
+                'event_id' => $this->route('event_id'),
+            ]);
+        }
+        return $isAuthorized;
     }
 
     protected function prepareForValidation(): void
@@ -23,11 +30,6 @@ class ResetEventRequest extends FormRequest
         ]);
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
@@ -39,7 +41,7 @@ class ResetEventRequest extends FormRequest
     {
         throw new HttpResponseException(response()->json([
             'success' => false,
-            'message' => 'Validation failed.',
+            'message' => 'Reset event request failed validation.',
             'errors' => $validator->errors(),
         ], 422));
     }
