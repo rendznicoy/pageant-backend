@@ -20,8 +20,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        DB::table('password_reset_tokens')
-            ->where('created_at', '<', now()->subHours(0.5)) // 2 hour expiration
-            ->delete();
+        if (app()->runningInConsole() && config('database.default') !== null) {
+            try {
+                DB::table('password_reset_tokens')
+                    ->where('created_at', '<', now()->subDay())
+                    ->delete();
+            } catch (\Exception $e) {
+                // Avoid crashing during build/deploy
+                logger()->warning('Skipping DB cleanup during package:discover: ' . $e->getMessage());
+            }
+        }
     }
 }
