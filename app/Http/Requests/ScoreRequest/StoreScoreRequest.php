@@ -35,7 +35,7 @@ class StoreScoreRequest extends FormRequest
             'judge_id' => 'required|exists:judges,judge_id',
             'candidate_id' => 'required|exists:candidates,candidate_id',
             'category_id' => 'required|exists:categories,category_id',
-            'score' => 'required|integer|min:1|max:10',
+            'score' => 'required|integer|min:0|max:100', // Changed min:1|max:10 to min:0|max:100
         ];
     }
 

@@ -21,7 +21,7 @@ return new class extends Migration
                   ->on('stages')
                   ->onDelete('cascade');
             $table->foreignId('event_id')->constrained('events', 'event_id')->onDelete('cascade');
-            $table->unsignedTinyInteger('score')->comment('1 to 10');
+            $table->unsignedTinyInteger('score')->comment('0 to 100');
             $table->text('comments')->nullable();
             $table->enum('status', ['temporary', 'confirmed'])->default('temporary');
             $table->timestamps();

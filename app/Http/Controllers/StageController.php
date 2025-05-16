@@ -92,7 +92,7 @@ class StageController extends Controller
 
         try {
             $updated = $stage->update(['status' => 'active']);
-            $stage->refresh(); // Refresh model to get latest database state
+            $stage->refresh();
             Log::info("Stage update attempted", [
                 'stage_id' => $stage_id,
                 'updated' => $updated,
@@ -146,14 +146,12 @@ class StageController extends Controller
         }
 
         try {
-            // Delete all scores for categories in this stage
             $deletedScores = Score::where('stage_id', $stage_id)->delete();
             Log::info("Scores deleted for stage", [
                 'stage_id' => $stage_id,
                 'deleted_count' => $deletedScores,
             ]);
 
-            // Reset all categories in this stage
             $updatedCategories = Category::where('stage_id', $stage_id)->update([
                 'status' => 'pending',
                 'current_candidate_id' => null,
@@ -163,7 +161,6 @@ class StageController extends Controller
                 'updated_count' => $updatedCategories,
             ]);
 
-            // Reset stage status
             $updated = $stage->update(['status' => 'pending']);
             $stage->refresh();
             Log::info("Stage reset attempted", [
@@ -191,54 +188,227 @@ class StageController extends Controller
     public function selectTopCandidates(Request $request, $event_id, $stage_id)
     {
         $request->validate([
-            'top_candidates_count' => 'required|integer|min:1',
+            'top_candidates_count' => [
+                'required',
+                'integer',
+                'min:2',
+                function ($attribute, $value, $fail) {
+                    if ($value % 2 !== 0) {
+                        $fail('The :attribute must be an even number.');
+                    }
+                },
+            ],
         ]);
         $stage = Stage::where('event_id', $event_id)->findOrFail($stage_id);
         if ($stage->status !== 'finalized') {
             return response()->json(['message' => 'Stage is not finalized'], 400);
         }
         $topCandidatesCount = $request->input('top_candidates_count');
-        $candidateCount = Candidate::where('event_id', $event_id)->where('is_active', true)->count();
-        if ($topCandidatesCount > $candidateCount) {
-            return response()->json(['message' => 'Top candidates count exceeds available candidates'], 400);
+        $halfCount = (int)($topCandidatesCount / 2);
+
+        // Validate candidate counts by sex
+        $maleCount = Candidate::where('event_id', $event_id)
+            ->where('is_active', true)
+            ->where('sex', 'male')
+            ->count();
+        $femaleCount = Candidate::where('event_id', $event_id)
+            ->where('is_active', true)
+            ->where('sex', 'female')
+            ->count();
+        if ($maleCount < $halfCount || $femaleCount < $halfCount) {
+            return response()->json([
+                'message' => "Not enough candidates (need at least $halfCount males and $halfCount females)",
+            ], 400);
         }
-        $stage->update(['top_candidates_count' => $topCandidatesCount]);
-        $topCandidates = Score::where('stage_id', $stage_id)
-            ->where('status', 'confirmed')
-            ->groupBy('candidate_id')
-            ->select('candidate_id', DB::raw('AVG(score) as average_score'))
+
+        // Get top male candidates
+        $topMales = Score::where('scores.stage_id', $stage_id)
+            ->where('scores.status', 'confirmed')
+            ->join('candidates', 'scores.candidate_id', '=', 'candidates.candidate_id')
+            ->where('candidates.sex', 'male')
+            ->groupBy('scores.candidate_id')
+            ->select('scores.candidate_id', DB::raw('AVG(scores.score) as average_score'))
             ->orderBy('average_score', 'desc')
-            ->take($topCandidatesCount)
+            ->take($halfCount)
             ->pluck('candidate_id');
+
+        // Get top female candidates
+        $topFemales = Score::where('scores.stage_id', $stage_id)
+            ->where('scores.status', 'confirmed')
+            ->join('candidates', 'scores.candidate_id', '=', 'candidates.candidate_id')
+            ->where('candidates.sex', 'female')
+            ->groupBy('scores.candidate_id')
+            ->select('scores.candidate_id', DB::raw('AVG(scores.score) as average_score'))
+            ->orderBy('average_score', 'desc')
+            ->take($halfCount)
+            ->pluck('candidate_id');
+
+        // Combine top candidates
+        $topCandidates = $topMales->merge($topFemales);
+
+        // Update candidate active status
         Candidate::where('event_id', $event_id)
             ->whereNotIn('candidate_id', $topCandidates)
+            ->where('is_active', true)
             ->update(['is_active' => false]);
-        return response()->json(['message' => 'Top candidates selected successfully', 'top_candidates' => $topCandidates]);
+
+        // Persist top_candidates_count
+        $stage->update(['top_candidates_count' => $topCandidatesCount]);
+
+        Log::info("Top candidates selected", [
+            'event_id' => $event_id,
+            'stage_id' => $stage_id,
+            'top_candidates_count' => $topCandidatesCount,
+            'male_candidates' => $topMales->toArray(),
+            'female_candidates' => $topFemales->toArray(),
+        ]);
+
+        return response()->json([
+            'message' => 'Top candidates selected successfully',
+            'top_candidates' => $topCandidates->toArray(),
+            'top_candidates_count' => $topCandidatesCount,
+        ]);
+    }
+
+    public function resetTopCandidates(Request $request, $event_id, $stage_id)
+    {
+        Log::info("StageController::resetTopCandidates called", [
+            'event_id' => $event_id,
+            'stage_id' => $stage_id,
+        ]);
+
+        $stage = Stage::where('event_id', $event_id)->findOrFail($stage_id);
+        if ($stage->status !== 'finalized') {
+            Log::warning("Stage is not finalized", ['stage_status' => $stage->status]);
+            return response()->json(['message' => 'Stage is not finalized'], 400);
+        }
+
+        try {
+            // Reset is_active to true for all candidates in the event
+            $updatedCount = Candidate::where('event_id', $event_id)
+                ->update(['is_active' => true]);
+
+            // Clear top_candidates_count
+            $stage->update(['top_candidates_count' => null]);
+
+            Log::info("Candidate active statuses reset", [
+                'event_id' => $event_id,
+                'stage_id' => $stage_id,
+                'updated_count' => $updatedCount,
+            ]);
+
+            return response()->json([
+                'message' => 'Top candidates selection reset successfully',
+                'updated_count' => $updatedCount,
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Exception in StageController::resetTopCandidates", [
+                'stage_id' => $stage_id,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'Server error: ' . $e->getMessage()], 500);
+        }
     }
 
     public function partialResults($event_id, $stage_id)
     {
+        Log::info("Fetching partial results", ['event_id' => $event_id, 'stage_id' => $stage_id]);
         $stage = Stage::where('event_id', $event_id)->findOrFail($stage_id);
-        if ($stage->status !== 'finalized') {
-            return response()->json(['message' => 'Stage is not finalized'], 400);
+
+        // Fetch confirmed scores with strict filters
+        $scores = Score::where('scores.stage_id', $stage_id)
+            ->where('scores.event_id', $event_id)
+            ->where('scores.status', 'confirmed')
+            ->whereNotNull('scores.score')
+            ->where('scores.score', '>=', 0)
+            ->where('scores.score', '<=', 100)
+            ->join('candidates', 'scores.candidate_id', '=', 'candidates.candidate_id')
+            ->join('categories', 'scores.category_id', '=', 'categories.category_id')
+            ->select(
+                'scores.candidate_id',
+                'scores.judge_id',
+                'candidates.sex',
+                'candidates.first_name',
+                'candidates.last_name',
+                'candidates.candidate_number',
+                DB::raw('SUM(CAST(scores.score AS DECIMAL(10,2)) * COALESCE(categories.category_weight, 0) / 100) as weighted_score')
+            )
+            ->groupBy('scores.candidate_id', 'scores.judge_id', 'candidates.sex', 'candidates.first_name', 'candidates.last_name', 'candidates.candidate_number')
+            ->havingRaw('weighted_score IS NOT NULL AND weighted_score >= 0')
+            ->get();
+
+        Log::info("Weighted scores query", [
+            'stage_id' => $stage_id,
+            'event_id' => $event_id,
+            'score_count' => $scores->count(),
+            'scores' => $scores->map(fn($score) => [
+                'candidate_id' => $score->candidate_id,
+                'judge_id' => $score->judge_id,
+                'weighted_score' => $score->weighted_score,
+                'sex' => $score->sex,
+            ])->toArray(),
+        ]);
+
+        // Validate data
+        $expectedJudges = 3;
+        $expectedCandidates = 3;
+        $judgeCount = $scores->groupBy('judge_id')->count();
+        $candidateCount = $scores->groupBy('candidate_id')->count();
+        if ($judgeCount != $expectedJudges || $candidateCount != $expectedCandidates) {
+            Log::warning("Unexpected number of judges or candidates", [
+                'judges' => $judgeCount,
+                'candidates' => $candidateCount,
+            ]);
         }
-        $results = Score::where('stage_id', $stage_id)
-            ->where('status', 'confirmed')
-            ->with(['candidate'])
-            ->groupBy('candidate_id')
-            ->select('candidate_id', DB::raw('AVG(score) as average_score'))
-            ->orderBy('average_score', 'desc')
-            ->get()
-            ->map(function ($result) {
-                return [
-                    'candidate_id' => $result->candidate_id,
-                    'candidate' => [
-                        'first_name' => $result->candidate->first_name,
-                        'last_name' => $result->candidate->last_name,
-                    ],
-                    'average_score' => $result->average_score,
-                ];
-            });
-        return response()->json(['results' => $results]);
+
+        // Group scores by candidate
+        $candidateScores = $scores->groupBy('candidate_id');
+
+        // Calculate Raw Average
+        $results = [];
+        foreach ($candidateScores as $candidate_id => $scoresForCandidate) {
+            $weightedScores = $scoresForCandidate->pluck('weighted_score')->map(fn($score) => (float) $score)->toArray();
+            $judgeCount = count($weightedScores);
+            $rawAverage = $judgeCount > 0 ? array_sum($weightedScores) / $judgeCount : 0;
+
+            $candidateData = $scoresForCandidate->first();
+
+            Log::debug("Raw Average calculated", [
+                'candidate_id' => $candidate_id,
+                'weighted_scores' => $weightedScores,
+                'judge_count' => $judgeCount,
+                'raw_average' => $rawAverage,
+            ]);
+
+            $results[] = [
+                'candidate_id' => $candidate_id,
+                'candidate' => [
+                    'first_name' => $candidateData->first_name,
+                    'last_name' => $candidateData->last_name,
+                    'candidate_number' => $candidateData->candidate_number,
+                ],
+                'sex' => $candidateData->sex,
+                'raw_average' => round($rawAverage, 2), // Format to 2 decimal places
+            ];
+        }
+
+        // Sort and rank by raw_average
+        usort($results, fn($a, $b) => $b['raw_average'] <=> $a['raw_average']);
+        $rank = 0;
+        $previousScore = null;
+        foreach ($results as $index => $result) {
+            if ($previousScore === null || $previousScore != $result['raw_average']) {
+                $rank = $index + 1;
+            }
+            $results[$index]['rank'] = $rank;
+            $previousScore = $result['raw_average'];
+        }
+
+        Log::info("Partial results response", [
+            'stage_id' => $stage_id,
+            'candidates' => $results,
+        ]);
+
+        return response()->json(['candidates' => $results]);
     }
 }

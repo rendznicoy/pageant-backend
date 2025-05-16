@@ -38,14 +38,14 @@ class UpdateScoreRequest extends FormRequest
                 Rule::exists('judges', 'judge_id')->where('event_id', $this->input('event_id')),
             ],
             'candidate_id' => [
-                'required', // Changed 'sometimes' to 'required' based on the error
+                'required',
                 Rule::exists('candidates', 'candidate_id')->where('event_id', $this->input('event_id')),
             ],
             'category_id' => [
-                'required', // Changed 'sometimes' to 'required' based on the error
+                'required',
                 Rule::exists('categories', 'category_id')->where('event_id', $this->input('event_id')),
             ],
-            'score' => 'sometimes|integer|min:1|max:10',
+            'score' => 'sometimes|integer|min:0|max:100', // Changed min:1|max:10 to min:0|max:100
         ];
     }
 

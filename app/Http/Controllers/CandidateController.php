@@ -13,7 +13,8 @@ use App\Models\Candidate;
 class CandidateController extends Controller
 {
     public function index(Request $request, $event_id) {
-        $query = Candidate::where('event_id', $event_id);
+        $query = Candidate::where('event_id', $event_id)
+            ->where('is_active', true); // Add is_active filter
         if ($request->has('sex')) {
             $query->where('sex', $request->query('sex'));
         }

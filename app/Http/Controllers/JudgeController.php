@@ -109,51 +109,53 @@ class JudgeController extends Controller
 
     public function currentSession(Request $request)
     {
-        $judge = auth()->user();
-        if (!$judge) {
-            Log::error("No authenticated user found in currentSession");
+        $user = auth()->user();
+        if (!$user) {
+            Log::error("No authenticated user found in currentSession", [
+                'path' => $request->path(),
+                'headers' => $request->headers->all(),
+                'token' => $request->bearerToken(),
+            ]);
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
-        Log::info("JudgeController::currentSession called", [
-            'judge_id' => $judge->user_id ?? 'null',
-            'judge_role' => $judge->role ?? 'null',
-            'judge_email' => $judge->email ?? 'null',
-            'judge_username' => $judge->username ?? 'null',
-            'auth_check' => auth()->check(),
-            'user_attributes' => (array)$judge
-        ]);
-        if (!$judge->user_id) {
-            Log::error("Authenticated user has no user_id", [
-                'email' => $judge->email,
-                'role' => $judge->role,
-                'attributes' => (array)$judge
-            ]);
-            return response()->json(['message' => 'User ID not found'], 500);
-        }
-        $judgeEntry = Judge::where('user_id', $judge->user_id)->first();
+
+        $judgeEntry = Judge::where('user_id', $user->user_id)->first();
         if (!$judgeEntry) {
             Log::warning("No judge entry found for user", [
-                'user_id' => $judge->user_id,
-                'email' => $judge->email,
+                'user_id' => $user->user_id,
+                'email' => $user->email,
             ]);
             return response()->json(['message' => 'No judge entry assigned'], 404);
         }
-        $event = Event::whereHas('judges', function ($query) use ($judge) {
-            $query->where('user_id', $judge->user_id);
+
+        Log::info("JudgeController::currentSession called", [
+            'judge_id' => $judgeEntry->judge_id, // Corrected to use judge_id
+            'user_id' => $user->user_id,
+            'judge_role' => $user->role,
+            'judge_email' => $user->email,
+            'judge_username' => $user->username,
+            'auth_check' => auth()->check(),
+            'token' => Str::limit($request->bearerToken(), 20), // Log partial token
+        ]);
+
+        $event = Event::whereHas('judges', function ($query) use ($user) {
+            $query->where('user_id', $user->user_id);
         })->first();
         if (!$event) {
             Log::warning("No event assigned to judge", [
-                'user_id' => $judge->user_id,
-                'judge_email' => $judge->email,
-                'judge_username' => $judge->username,
+                'judge_id' => $judgeEntry->judge_id,
+                'user_id' => $user->user_id,
+                'judge_email' => $user->email,
             ]);
             return response()->json(['message' => 'No event assigned'], 404);
         }
+
         Log::info("Event found for judge", [
             'event_id' => $event->event_id,
             'event_name' => $event->event_name,
             'event_status' => $event->status,
         ]);
+
         $currentCategory = Category::where('event_id', $event->event_id)
             ->where('status', 'active')
             ->with('stage')
@@ -171,8 +173,15 @@ class JudgeController extends Controller
                 'event_name' => $event->event_name,
                 'status' => $event->status,
             ],
-            'judge_name' => $judge->first_name . ' ' . $judge->last_name,
-            'judge' => $judgeEntry,
+            'judge_name' => $user->first_name . ' ' . $user->last_name,
+            'judge' => [
+                'judge_id' => $judgeEntry->judge_id,
+                'user_id' => $judgeEntry->user_id,
+                'event_id' => $judgeEntry->event_id,
+                'pin_code' => $judgeEntry->pin_code,
+                'created_at' => $judgeEntry->created_at,
+                'updated_at' => $judgeEntry->updated_at,
+            ],
             'current_category' => $currentCategory ? [
                 'category_id' => $currentCategory->category_id,
                 'category_name' => $currentCategory->category_name,
@@ -194,7 +203,7 @@ class JudgeController extends Controller
                 'max_score' => $currentCategory->max_score,
             ]] : []
         ]);
-    }
+}
 
     public function scoringSession(Request $request)
     {

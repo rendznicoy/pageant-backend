@@ -98,9 +98,19 @@ class CategoryController extends Controller
             return response()->json(['message' => 'Parent stage is not active'], 400);
         }
 
+        // Check if any other category in the same stage is active
+        $activeCategory = Category::where('stage_id', $category->stage_id)
+            ->where('status', 'active')
+            ->where('category_id', '!=', $category_id)
+            ->exists();
+        if ($activeCategory) {
+            Log::warning("Another category in the stage is active", ['stage_id' => $category->stage_id]);
+            return response()->json(['message' => 'Another category in this stage is already active'], 400);
+        }
+
         try {
             $updated = $category->update(['status' => 'active']);
-            $category->refresh(); // Refresh model to get latest database state
+            $category->refresh();
             Log::info("Category update attempted", [
                 'category_id' => $category_id,
                 'updated' => $updated,
@@ -137,14 +147,12 @@ class CategoryController extends Controller
         }
 
         try {
-            // Delete all scores for this category
             $deletedScores = Score::where('category_id', $category_id)->delete();
             Log::info("Scores deleted for category", [
                 'category_id' => $category_id,
                 'deleted_count' => $deletedScores,
             ]);
 
-            // Reset category status and current candidate
             $updated = $category->update([
                 'status' => 'pending',
                 'current_candidate_id' => null,
@@ -199,7 +207,7 @@ class CategoryController extends Controller
 
         if ($category->current_candidate_id) {
             // Get all judges for the event
-            $judges = Judge::where('event_id', $event_id)->pluck('user_id');
+            $judges = Judge::where('event_id', $event_id)->pluck('judge_id');
             $judgeCount = $judges->count();
 
             // Count confirmed scores for the current candidate in this category
@@ -297,16 +305,33 @@ class CategoryController extends Controller
                 Log::info('No current candidate for category', ['category_id' => $category_id]);
                 return response()->json(['has_pending_scores' => false]);
             }
-            $pendingScores = Score::where('category_id', $category_id)
+            $judges = Judge::where('event_id', $event_id)->pluck('judge_id');
+            $judgeCount = $judges->count();
+
+            $confirmedScores = Score::where('category_id', $category_id)
+                ->where('candidate_id', $category->current_candidate_id)
+                ->where('status', 'confirmed')
+                ->whereIn('judge_id', $judges)
+                ->count();
+
+            $temporaryScores = Score::where('category_id', $category_id)
                 ->where('candidate_id', $category->current_candidate_id)
                 ->where('status', 'temporary')
+                ->whereIn('judge_id', $judges)
                 ->exists();
+
+            $hasPendingScores = $confirmedScores < $judgeCount || $temporaryScores;
+
             Log::info('Pending scores check result', [
                 'category_id' => $category_id,
                 'candidate_id' => $category->current_candidate_id,
-                'has_pending_scores' => $pendingScores,
+                'judge_count' => $judgeCount,
+                'confirmed_scores_count' => $confirmedScores,
+                'has_temporary_scores' => $temporaryScores,
+                'has_pending_scores' => $hasPendingScores,
             ]);
-            return response()->json(['has_pending_scores' => $pendingScores]);
+
+            return response()->json(['has_pending_scores' => $hasPendingScores]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error('Validation error in hasPendingScores', [
                 'event_id' => $event_id,
@@ -336,30 +361,52 @@ class CategoryController extends Controller
         ]);
 
         $categories = Category::where('event_id', $event_id)->get();
-        $judges = Judge::where('event_id', $event_id)->pluck('user_id');
+        $judges = Judge::where('event_id', $event_id)->pluck('judge_id');
         $judgeCount = $judges->count();
 
         $results = [];
         foreach ($categories as $category) {
             $hasPendingScores = false;
+            // Debug: Log all scores for the category
+            $allScores = Score::where('category_id', $category->category_id)
+                ->whereIn('judge_id', $judges)
+                ->get();
+            Log::info("All scores for category", [
+                'category_id' => $category->category_id,
+                'scores' => $allScores->toArray(),
+            ]);
+
             if ($category->current_candidate_id) {
-                // Count confirmed scores for the current candidate
                 $confirmedScores = Score::where('category_id', $category->category_id)
                     ->where('candidate_id', $category->current_candidate_id)
                     ->where('status', 'confirmed')
                     ->whereIn('judge_id', $judges)
                     ->count();
 
-                // Check for temporary scores
                 $temporaryScores = Score::where('category_id', $category->category_id)
                     ->where('candidate_id', $category->current_candidate_id)
                     ->where('status', 'temporary')
                     ->whereIn('judge_id', $judges)
                     ->exists();
 
-                // Category has pending scores if not all judges have confirmed or there are temporary scores
                 $hasPendingScores = $confirmedScores < $judgeCount || $temporaryScores;
+            } else {
+                // Check if any scores exist for the category
+                $hasPendingScores = Score::where('category_id', $category->category_id)
+                    ->whereIn('judge_id', $judges)
+                    ->whereIn('status', ['temporary', 'confirmed'])
+                    ->exists();
             }
+
+            Log::info("Pending scores check for category", [
+                'category_id' => $category->category_id,
+                'current_candidate_id' => $category->current_candidate_id,
+                'judge_count' => $judgeCount,
+                'confirmed_scores_count' => $confirmedScores ?? 0,
+                'has_temporary_scores' => $temporaryScores ?? false,
+                'has_pending_scores' => $hasPendingScores,
+            ]);
+
             $results[$category->category_id] = $hasPendingScores;
         }
 

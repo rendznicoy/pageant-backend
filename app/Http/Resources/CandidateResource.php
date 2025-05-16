@@ -25,6 +25,7 @@ class CandidateResource extends JsonResource
             'sex' => $this->sex,
             'team' => $this->team,
             'photo' => base64_encode($this->photo),
+            'is_active' => $this->is_active, // Add is_active
         ];
     }
 }

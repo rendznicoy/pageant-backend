@@ -19,11 +19,14 @@ class RoleMiddleware
     {
         $user = auth()->user();
         if (!$user) {
-            Log::error("No authenticated user in RoleMiddleware", [
-                'path' => $request->path(),
-                'roles' => $roles,
-                'auth_check' => auth()->check(),
-            ]);
+            // Skip logging for api/v1/user to reduce noise
+            if ($request->path() !== 'api/v1/user') {
+                Log::error("No authenticated user in RoleMiddleware", [
+                    'path' => $request->path(),
+                    'roles' => $roles,
+                    'auth_check' => auth()->check(),
+                ]);
+            }
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 

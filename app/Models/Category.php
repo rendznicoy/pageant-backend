@@ -4,23 +4,29 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 
 class Category extends Model
 {
     use HasFactory;
 
     protected $table = 'categories';
-
     protected $primaryKey = 'category_id';
 
     protected $fillable = [
         'event_id',
         'stage_id',
         'category_name',
+        'status',
+        'current_candidate_id',
         'category_weight',
         'max_score',
-        'status', // Add status to fillable
-        'current_candidate_id',
+    ];
+
+    protected $attributes = [
+        'status' => 'pending',
+        'category_weight' => 100,
+        'max_score' => 100,
     ];
 
     protected $casts = [
@@ -30,21 +36,52 @@ class Category extends Model
 
     public function event()
     {
-        return $this->belongsTo(Event::class, 'event_id');
+        return $this->belongsTo(Event::class, 'event_id', 'event_id');
     }
 
     public function stage()
     {
-        return $this->belongsTo(Stage::class, 'stage_id');
+        return $this->belongsTo(Stage::class, 'stage_id', 'stage_id');
     }
 
     public function scores()
     {
-        return $this->hasMany(Score::class, 'category_id');
+        return $this->hasMany(Score::class, 'category_id', 'category_id');
     }
 
-    public function currentCandidate()
+    /**
+     * Check if the category has pending scores for the current candidate.
+     *
+     * @return bool
+     */
+    public function hasPendingScores()
     {
-        return $this->belongsTo(Candidate::class, 'current_candidate_id');
+        if (!$this->current_candidate_id) {
+            return false; // No candidate set, so no pending scores
+        }
+
+        $judgeCount = Judge::where('event_id', $this->event_id)->count();
+        $confirmedScoreCount = Score::where('category_id', $this->category_id)
+            ->where('event_id', $this->event_id)
+            ->where('candidate_id', $this->current_candidate_id)
+            ->where('status', 'confirmed')
+            ->count();
+
+        $hasTemporaryScores = Score::where('category_id', $this->category_id)
+            ->where('event_id', $this->event_id)
+            ->where('candidate_id', $this->current_candidate_id)
+            ->where('status', 'temporary')
+            ->exists();
+
+        Log::debug("hasPendingScores checked", [
+            'category_id' => $this->category_id,
+            'event_id' => $this->event_id,
+            'current_candidate_id' => $this->current_candidate_id,
+            'judge_count' => $judgeCount,
+            'confirmed_score_count' => $confirmedScoreCount,
+            'has_temporary_scores' => $hasTemporaryScores,
+        ]);
+
+        return $confirmedScoreCount < $judgeCount || $hasTemporaryScores;
     }
 }

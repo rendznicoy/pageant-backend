@@ -16,14 +16,16 @@
         <thead>
             <tr>
                 <th>Candidate</th>
-                <th>Average Score</th>
+                <th>Raw Average Score</th>
+                <th>Rank</th>
             </tr>
         </thead>
         <tbody>
             @foreach ($results as $result)
                 <tr>
                     <td>{{ $result->candidate->first_name }} {{ $result->candidate->last_name }}</td>
-                    <td>{{ number_format($result->average_score, 2) }}</td>
+                    <td>{{ number_format($result->raw_average, 2) }}/100</td>
+                    <td>{{ $result->rank }}</td>
                 </tr>
             @endforeach
         </tbody>

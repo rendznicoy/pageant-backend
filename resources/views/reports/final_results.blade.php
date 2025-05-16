@@ -23,7 +23,7 @@
             @foreach ($results as $result)
                 <tr>
                     <td>{{ $result->candidate->first_name }} {{ $result->candidate->last_name }}</td>
-                    <td>{{ number_format($result->average_score, 2) }}</td>
+                    <td>{{ number_format($result->average_score, 2) }}/100</td>
                 </tr>
             @endforeach
         </tbody>

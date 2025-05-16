@@ -1,41 +1,87 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>Event Report</title>
+    <meta charset="UTF-8">
+    <title>{{ $event->event_name }} Results</title>
     <style>
-        body { font-family: DejaVu Sans, sans-serif; font-size: 12px; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #1a73e8;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #444;
+            font-size: 18px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .page-break {
+            page-break-after: always;
+        }
+        p.no-results {
+            font-style: italic;
+            color: #666;
+            font-size: 14px;
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body>
-    <h1>{{ $event->event_name }} - Report</h1>
+    <h1>{{ $event->event_name }} Results</h1>
 
-    <h2>Judges</h2>
-    <ul>
-        @foreach($judges as $judge)
-            <li>{{ $judge->user->first_name }} {{ $judge->user->last_name }}</li>
-        @endforeach
-    </ul>
-
-    <h2>Candidates</h2>
-    <ul>
-        @foreach($candidates as $candidate)
-            <li>#{{ $candidate->candidate_number }} - {{ $candidate->first_name }} {{ $candidate->last_name }} ({{ ucfirst($candidate->sex) }})</li>
-        @endforeach
-    </ul>
-
-    <h2>Categories</h2>
-    <ul>
-        @foreach($categories as $category)
-            <li>{{ $category->category_name }} ({{ $category->category_weight }}%)</li>
-        @endforeach
-    </ul>
-
-    <h2>Scores</h2>
-    <ul>
-        @foreach($scores as $score)
-            <li>Candidate {{ $score->candidate_id }} | Category {{ $score->category_id }} | Judge {{ $score->judge_id }} : {{ $score->score }}</li>
-        @endforeach
-    </ul>
+    @foreach ($stages as $index => $stage)
+        <h2>{{ $stage->stage_name ?? 'Stage ' . ($index + 1) }}</h2>
+        @if ($stage->results->isEmpty())
+            <p class="no-results">No results available for this stage.</p>
+        @else
+            <table>
+                <thead>
+                    <tr>
+                        <th>Candidate</th>
+                        <th>Average Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($stage->results as $result)
+                        <tr>
+                            <td>
+                                {{ $result->first_name }} {{ $result->last_name }}
+                                ({{ $result->candidate_number ? '#' . $result->candidate_number : 'N/A' }})
+                            </td>
+                            <td>{{ number_format($result->raw_average ?? 0, 2) }}/100</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
+        @if ($index < $stages->count() - 1)
+            <div class="page-break"></div>
+        @endif
+    @endforeach
 </body>
 </html>

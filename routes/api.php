@@ -66,6 +66,7 @@ Route::prefix('v1')->group(function () {
                     Route::post('/{stage_id}/finalize', [StageController::class, 'finalize']);
                     Route::post('/{stage_id}/reset', [StageController::class, 'reset']);
                     Route::post('/{stage_id}/select-top-candidates', [StageController::class, 'selectTopCandidates']);
+                    Route::post('/{stage_id}/reset-top-candidates', [StageController::class, 'resetTopCandidates']);
                     Route::get('/{stage_id}/partial-results', [StageController::class, 'partialResults']);
                 });
 
@@ -114,7 +115,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Judge-only routes
-    Route::middleware(['auth:sanctum', 'role:judge'])->group(function () {
+    Route::middleware(['auth:sanctum', 'role:judge', 'no.cache'])->group(function () {
         Route::prefix('judge')->group(function () {
             Route::get('current-session', [JudgeController::class, 'currentSession']);
             Route::get('scoring-session', [JudgeController::class, 'scoringSession']);

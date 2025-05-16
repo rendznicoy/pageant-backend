@@ -8,6 +8,7 @@ use App\Models\Judge;
 use App\Models\Stage;
 use App\Models\Category;
 use App\Models\Candidate;
+use App\Models\Score;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -17,7 +18,17 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // Create Tabulator user
+        // Create Admin
+        $admin = User::create([
+            'username' => 'AdminUser',
+            'email' => 'admin@example.com',
+            'password' => Hash::make('adminpassword'),
+            'first_name' => 'Admin',
+            'last_name' => 'User',
+            'role' => 'admin',
+        ]);
+
+        // Create Tabulator
         $tabulator = User::create([
             'username' => 'TabulatorUser',
             'email' => 'tabulator@example.com',
@@ -27,19 +38,19 @@ class DatabaseSeeder extends Seeder
             'role' => 'tabulator',
         ]);
 
-        // Create one active event with complete details
+        // Create Event
         $event = Event::create([
-            'event_name' => 'Annual Talent Competition 2025',
-            'event_code' => 'ATC2025',
-            'start_date' => Carbon::now()->format('Y-m-d H:i:s'),
-            'end_date' => Carbon::now()->addDays(2)->format('Y-m-d H:i:s'),
-            'description' => 'A grand talent competition showcasing various skills and performances.',
+            'event_name' => 'Grand Pageant 2025',
+            'event_code' => 'GP2025',
+            'start_date' => Carbon::now(),
+            'end_date' => Carbon::now()->addDays(2),
+            'description' => 'A prestigious event highlighting beauty, intelligence, and grace.',
             'status' => 'active',
             'created_by' => $tabulator->user_id,
-            'cover_photo' => null, // Can add a fake path if needed for testing
+            'cover_photo' => null,
         ]);
 
-        // Create 3 judges
+        // Create Judges
         $judges = collect();
         foreach (['Simon', 'Clara', 'James'] as $index => $name) {
             $user = User::create([
@@ -62,52 +73,77 @@ class DatabaseSeeder extends Seeder
             ]));
         }
 
-        // Create 10 candidates (5 male, 5 female)
+        // Create 10 Candidate Pairs (10 male + 10 female), each pair with unique team
         $candidates = collect();
-        $teams = ['Team Alpha', 'Team Beta', 'Team Gamma'];
-        foreach (range(1, 5) as $num) {
+        foreach (range(1, 10) as $num) {
+            $teamName = "Team Pair {$num}";
+
             $candidates->push(Candidate::create([
                 'event_id' => $event->event_id,
                 'candidate_number' => $num,
                 'first_name' => 'Male' . $num,
                 'last_name' => 'Candidate',
                 'sex' => 'male',
-                'team' => $teams[array_rand($teams)],
-                'photo' => null, // Can add a fake path if needed
+                'team' => $teamName,
+                'photo' => null,
             ]));
+
             $candidates->push(Candidate::create([
                 'event_id' => $event->event_id,
-                'candidate_number' => $num + 5,
+                'candidate_number' => $num,
                 'first_name' => 'Female' . $num,
                 'last_name' => 'Candidate',
                 'sex' => 'female',
-                'team' => $teams[array_rand($teams)],
-                'photo' => null, // Can add a fake path if needed
+                'team' => $teamName,
+                'photo' => null,
             ]));
         }
 
-        // Create 3 stages
+        // Create 3 Stages
+        $stageNames = ['Preliminary', 'Swimsuit Show', 'Evening Gown'];
         $stages = collect();
-        foreach (['Preliminary', 'Semi-Final', 'Final'] as $stageName) {
+        foreach ($stageNames as $index => $name) {
             $stages->push(Stage::create([
                 'event_id' => $event->event_id,
-                'stage_name' => $stageName,
+                'stage_name' => $name,
+                'status' => $index === 0 ? 'finalized' : 'pending',
             ]));
         }
 
-        // Create 3 categories per stage
+        // Create 4 Categories per Stage
+        $categoryNames = ['Beauty & Physique', 'Swim Wear', 'Formal Wear', 'Q & A'];
         $categories = collect();
-        $categoryNames = ['Performance', 'Creativity', 'Presentation'];
-        $weights = [40, 30, 30]; // Sum to 100 for simplicity
+
         foreach ($stages as $stage) {
-            foreach (range(0, 2) as $index) {
+            foreach ($categoryNames as $catName) {
                 $categories->push(Category::create([
                     'event_id' => $event->event_id,
                     'stage_id' => $stage->stage_id,
-                    'category_name' => $categoryNames[$index],
-                    'category_weight' => $weights[$index],
-                    'max_score' => 10,
+                    'category_name' => $catName,
+                    'category_weight' => 25,
+                    'max_score' => 100,
+                    'status' => $stage->status === 'finalized' ? 'finalized' : 'pending',
                 ]));
+            }
+        }
+
+        // Fill Scores for Finalized Stage only
+        $finalStage = $stages->firstWhere('status', 'finalized');
+        $finalCategories = $categories->where('stage_id', $finalStage->stage_id);
+
+        foreach ($judges as $judge) {
+            foreach ($candidates as $candidate) {
+                foreach ($finalCategories as $category) {
+                    Score::create([
+                        'event_id' => $event->event_id,
+                        'judge_id' => $judge->judge_id,
+                        'stage_id' => $finalStage->stage_id,
+                        'category_id' => $category->category_id,
+                        'candidate_id' => $candidate->candidate_id,
+                        'score' => rand(60, 100),
+                        'status' => 'confirmed',
+                    ]);
+                }
             }
         }
     }

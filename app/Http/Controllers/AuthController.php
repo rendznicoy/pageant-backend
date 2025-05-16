@@ -125,32 +125,42 @@ class AuthController extends Controller
         $request->validate([
             'pin_code' => 'required|string',
         ]);
+
         $judge = Judge::where('pin_code', $request->pin_code)->first();
         if (!$judge) {
+            Log::error("Invalid PIN code", ['pin_code' => $request->pin_code]);
             return response()->json(['message' => 'Invalid PIN code.'], 422);
         }
+
         $user = $judge->user;
         if (!$user) {
-            Log::error("No user associated with judge", ['judge_id' => $judge->id]);
+            Log::error("No user associated with judge", ['judge_id' => $judge->judge_id]);
             return response()->json(['message' => 'No user account found for this judge.'], 422);
         }
-        Auth::login($user);
-        $request->session()->regenerate();
+
+        // Revoke existing tokens
+        $user->tokens()->delete();
+
+        // Create new token without session login
         $token = $user->createToken('judge-token')->plainTextToken;
+
         Log::info("Judge login successful", [
-            'user_id' => $user->user_id ?? 'null',
+            'user_id' => $user->user_id,
             'email' => $user->email,
             'username' => $user->username,
             'role' => $user->role,
-            'token' => $token
+            'judge_id' => $judge->judge_id,
+            'token' => Str::limit($token, 20),
         ]);
+
         return response()->json([
             'message' => 'Judge login successful',
             'user' => [
                 'user_id' => $user->user_id,
                 'email' => $user->email,
                 'username' => $user->username,
-                'role' => $user->role
+                'role' => $user->role,
+                'judge_id' => $judge->judge_id,
             ],
             'token' => $token
         ]);
