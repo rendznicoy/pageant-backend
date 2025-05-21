@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Log;
 
 /*
 |--------------------------------------------------------------------------
@@ -14,5 +15,12 @@ use Illuminate\Support\Facades\Broadcast;
 */
 
 Broadcast::channel('event.{eventId}', function ($user, $eventId) {
-    return $user->hasEventAccess($eventId);
+    $hasAccess = $user->hasEventAccess($eventId);
+    Log::info('Channel authorization', [
+        'user_id' => $user->user_id,
+        'event_id' => $eventId,
+        'has_access' => $hasAccess,
+        'role' => $user->role,
+    ]);
+    return $hasAccess;
 });

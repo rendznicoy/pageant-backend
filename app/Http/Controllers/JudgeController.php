@@ -13,6 +13,7 @@ use App\Models\Event;
 use App\Models\User;
 use App\Models\Category;
 use App\Models\Candidate;
+use App\Models\Score;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
@@ -129,13 +130,13 @@ class JudgeController extends Controller
         }
 
         Log::info("JudgeController::currentSession called", [
-            'judge_id' => $judgeEntry->judge_id, // Corrected to use judge_id
+            'judge_id' => $judgeEntry->judge_id,
             'user_id' => $user->user_id,
             'judge_role' => $user->role,
             'judge_email' => $user->email,
             'judge_username' => $user->username,
             'auth_check' => auth()->check(),
-            'token' => Str::limit($request->bearerToken(), 20), // Log partial token
+            'token' => Str::limit($request->bearerToken(), 20),
         ]);
 
         $event = Event::whereHas('judges', function ($query) use ($user) {
@@ -167,10 +168,29 @@ class JudgeController extends Controller
                 ->first()
             : null;
 
+        $scoreStatus = 'none';
+        if ($nextCandidate && $currentCategory) {
+            $score = Score::findByCompositeKey([
+                'judge_id' => $judgeEntry->judge_id,
+                'candidate_id' => $nextCandidate->candidate_id,
+                'category_id' => $currentCategory->category_id,
+                'event_id' => $event->event_id,
+            ]);
+            $scoreStatus = $score ? $score->status : 'none';
+            Log::info("Score status for judge", [
+                'judge_id' => $judgeEntry->judge_id,
+                'candidate_id' => $nextCandidate->candidate_id,
+                'category_id' => $currentCategory->category_id,
+                'event_id' => $event->event_id,
+                'score_status' => $scoreStatus,
+            ]);
+        }
+
         return response()->json([
             'event' => [
                 'event_id' => $event->event_id,
                 'event_name' => $event->event_name,
+                'venue' => $event->venue, // Added
                 'status' => $event->status,
             ],
             'judge_name' => $user->first_name . ' ' . $user->last_name,
@@ -201,62 +221,8 @@ class JudgeController extends Controller
                 'id' => $currentCategory->category_id,
                 'name' => $currentCategory->category_name,
                 'max_score' => $currentCategory->max_score,
-            ]] : []
-        ]);
-}
-
-    public function scoringSession(Request $request)
-    {
-        $request->validate([
-            'event_id' => 'required|exists:events,event_id',
-            'category_id' => 'required|exists:categories,category_id',
-            'stage' => 'required|exists:stages,stage_id',
-        ]);
-
-        $judge = auth()->user();
-        $category = Category::where('event_id', $request->event_id)
-            ->where('category_id', $request->category_id)
-            ->where('stage_id', $request->stage)
-            ->where('status', 'active')
-            ->firstOrFail();
-
-        $event = Event::findOrFail($request->event_id);
-        if ($event->status !== 'active') {
-            return response()->json(['message' => 'Event is not active'], 403);
-        }
-
-        $nextCandidate = Candidate::where('event_id', $request->event_id)
-            ->where('is_active', true)
-            ->where('candidate_id', $category->current_candidate_id)
-            ->first();
-
-        return response()->json([
-            'event' => [
-                'event_id' => $event->event_id,
-                'event_name' => $event->event_name,
-            ],
-            'category' => [
-                'category_id' => $category->category_id,
-                'category_name' => $category->category_name,
-                'max_score' => $category->max_score,
-                'stage' => [
-                    'stage_id' => $category->stage->stage_id,
-                    'stage_name' => $category->stage->stage_name,
-                ],
-            ],
-            'criteria' => [[
-                'id' => $category->category_id,
-                'name' => $category->category_name,
-                'max_score' => $category->max_score,
-            ]],
-            'next_candidate' => $nextCandidate ? [
-                'candidate_id' => $nextCandidate->candidate_id,
-                'candidate_number' => $nextCandidate->candidate_number,
-                'first_name' => $nextCandidate->first_name,
-                'last_name' => $nextCandidate->last_name,
-                'team' => $nextCandidate->team,
-                'photo' => $nextCandidate->photo,
-            ] : null,
+            ]] : [],
+            'score_status' => $scoreStatus,
         ]);
     }
 }

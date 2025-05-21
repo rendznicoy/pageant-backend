@@ -49,15 +49,14 @@ class Category extends Model
         return $this->hasMany(Score::class, 'category_id', 'category_id');
     }
 
-    /**
-     * Check if the category has pending scores for the current candidate.
-     *
-     * @return bool
-     */
     public function hasPendingScores()
     {
         if (!$this->current_candidate_id) {
-            return false; // No candidate set, so no pending scores
+            Log::debug("No current candidate for category", [
+                'category_id' => $this->category_id,
+                'event_id' => $this->event_id,
+            ]);
+            return false;
         }
 
         $judgeCount = Judge::where('event_id', $this->event_id)->count();
@@ -73,15 +72,18 @@ class Category extends Model
             ->where('status', 'temporary')
             ->exists();
 
-        Log::debug("hasPendingScores checked", [
+        $hasPending = $confirmedScoreCount < $judgeCount || $hasTemporaryScores;
+
+        Log::info("Pending scores check for category", [
             'category_id' => $this->category_id,
             'event_id' => $this->event_id,
             'current_candidate_id' => $this->current_candidate_id,
             'judge_count' => $judgeCount,
-            'confirmed_score_count' => $confirmedScoreCount,
+            'confirmed_scores_count' => $confirmedScoreCount,
             'has_temporary_scores' => $hasTemporaryScores,
+            'has_pending_scores' => $hasPending,
         ]);
 
-        return $confirmedScoreCount < $judgeCount || $hasTemporaryScores;
+        return $hasPending;
     }
 }

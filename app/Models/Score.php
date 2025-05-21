@@ -11,9 +11,9 @@ class Score extends Model
 
     protected $table = 'scores';
 
-    public $incrementing = false; // No auto-incrementing ID
-    protected $primaryKey = null; // No single primary key
-    protected $keyType = 'array'; // Composite key
+    public $incrementing = false;
+    protected $primaryKey = null;
+    protected $keyType = 'array';
 
     protected $fillable = [
         'judge_id',
@@ -63,11 +63,6 @@ class Score extends Model
         return $this->belongsTo(Stage::class, 'stage_id', 'stage_id');
     }
 
-    /**
-     * Get the primary key for the model.
-     *
-     * @return array
-     */
     public function getKey()
     {
         return [
@@ -78,12 +73,6 @@ class Score extends Model
         ];
     }
 
-    /**
-     * Set the keys for a save query.
-     *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
     protected function setKeysForSaveQuery($query)
     {
         $keys = $this->getKey();
@@ -93,12 +82,6 @@ class Score extends Model
         return $query;
     }
 
-    /**
-     * Find a model by its composite key.
-     *
-     * @param  array  $attributes
-     * @return \Illuminate\Database\Eloquent\Model|null
-     */
     public static function findByCompositeKey(array $attributes)
     {
         $query = static::query();
@@ -106,5 +89,40 @@ class Score extends Model
             $query->where($key, '=', $value);
         }
         return $query->first();
+    }
+
+    /**
+     * Get the value used to identify the model for queue serialization.
+     *
+     * @return array
+     */
+    public function getQueueableId()
+    {
+        return $this->getKey();
+    }
+
+    /**
+     * Get the relationships that should be serialized.
+     *
+     * @return array
+     */
+    public function getQueueableRelations()
+    {
+        return [];
+    }
+
+    /**
+     * Resolve a model instance from a queueable ID.
+     *
+     * @param  mixed  $id
+     * @return \Illuminate\Database\Eloquent\Model|null
+     */
+    public static function resolveFromQueueableId($id)
+    {
+        if (!is_array($id)) {
+            return null;
+        }
+
+        return static::findByCompositeKey($id);
     }
 }

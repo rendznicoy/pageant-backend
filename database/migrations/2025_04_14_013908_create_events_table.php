@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id('event_id');
             $table->string('event_name');
             $table->string('event_code')->unique();
+            $table->string('venue')->nullable();
             $table->datetime('start_date')->nullable();
             $table->datetime('end_date')->nullable();
             $table->enum('status', ['inactive', 'active', 'completed'])->default('inactive');

@@ -16,6 +16,7 @@ use App\Http\Requests\EventRequest\ShowEventRequest;
 use App\Http\Resources\EventResource;
 use App\Jobs\DeleteJudgeAccounts;
 use App\Events\EventStatusUpdated;
+use App\Events\EventFinalized;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
@@ -107,57 +108,74 @@ class EventController extends Controller
         }
     }
 
-    public function update(UpdateEventRequest $request)
+    public function update(UpdateEventRequest $request, $event_id)
     {
         try {
             $validated = $request->validated();
-            $event = Event::findOrFail($validated['event_id']);
+            $event = Event::findOrFail($event_id);
+            $updateData = [];
+            $fields = ['event_name', 'venue', 'description', 'start_date', 'end_date'];
 
-            Log::info('Update request data:', $validated);
-            
-            if (isset($validated['start_date'])) {
-                Log::info('Original start_date: ' . $validated['start_date']);
-                $validated['start_date'] = Carbon::parse($validated['start_date'])
-                    ->setTimezone('UTC')
-                    ->format('Y-m-d H:i:s');
-                Log::info('Formatted start_date for database: ' . $validated['start_date']);
-            }
-            
-            if (isset($validated['end_date'])) {
-                Log::info('Original end_date: ' . $validated['end_date']);
-                $validated['end_date'] = Carbon::parse($validated['end_date'])
-                    ->setTimezone('UTC')
-                    ->format('Y-m-d H:i:s');
-                Log::info('Formatted end_date for database: ' . $validated['end_date']);
+            foreach ($fields as $field) {
+                if (in_array($field, ['start_date', 'end_date']) && isset($validated[$field])) {
+                    $submitted = Carbon::parse($validated[$field])->utc()->format('Y-m-d H:i:s');
+                    $existing = $event->$field
+                        ? Carbon::parse($event->$field)->utc()->format('Y-m-d H:i:s')
+                        : null;
+                
+                    if ($submitted !== $existing) {
+                        $updateData[$field] = $submitted;
+                    }
+                }
+                 elseif (isset($validated[$field])) {
+                    $new = $validated[$field];
+                    $old = $event->$field;
+                    if ($new !== $old) {
+                        $updateData[$field] = $new;
+                    }
+                }
             }
 
+            // Compare cover photo
             if ($request->hasFile('cover_photo')) {
                 $file = $request->file('cover_photo');
-                if (!$file->isValid()) {
-                    throw new \Exception('Invalid file upload');
+                if ($file->isValid()) {
+                    $newName = $file->getClientOriginalName();
+                    $oldName = $event->cover_photo ? basename($event->cover_photo) : '';
+                    if ($newName !== $oldName) {
+                        if ($event->cover_photo) {
+                            Storage::disk('public')->delete($event->cover_photo);
+                        }
+                        $path = $file->store('event_covers', 'public');
+                        $updateData['cover_photo'] = $path;
+                    }
                 }
-                
-                if ($event->cover_photo) {
-                    Storage::disk('public')->delete($event->cover_photo);
-                }
-
-                $path = $file->store('event_covers', 'public');
-                $validated['cover_photo'] = $path;
             }
 
-            $event->update($validated);
-            
+            if (empty($updateData)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No changes were made to the event.',
+                ], 200);
+            }
+
+            $event->update($updateData);
+
             return response()->json([
+                'success' => true,
                 'message' => 'Event updated successfully.',
-                'event' => new EventResource($event)
+                'event' => new EventResource($event->fresh()),
             ]);
-        } catch (\Exception $fileException) {
-            Log::error('File upload error: ' . $fileException->getMessage());
-            return response()->json(['message' => 'Failed to upload file: ' . $fileException->getMessage()], 500);
-        } catch (\Exception $databaseException) {
-            Log::error('Database update error: ' . $databaseException->getMessage());
-            return response()->json(['message' => 'Failed to update event data: ' . $databaseException->getMessage()], 500);
-        }  
+        } catch (\Exception $e) {
+            Log::error('Event update failed', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update event: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function destroy(DestroyEventRequest $request)
@@ -224,7 +242,17 @@ class EventController extends Controller
 
             $event->update(['status' => 'completed']);
             broadcast(new EventStatusUpdated($event->event_id, 'completed'))->toOthers();
-            DeleteJudgeAccounts::dispatch($event->event_id)->delay(now()->addMinutes(5));
+            try {
+                broadcast(new EventFinalized($event->event_id))->toOthers();
+                Log::info('EventFinalized broadcast attempted', ['event_id' => $event->event_id]);
+            } catch (\Exception $e) {
+                Log::error('Failed to broadcast EventFinalized', [
+                    'event_id' => $event->event_id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            }
+            DeleteJudgeAccounts::dispatch($event->event_id)->delay(now()->addMinute());
 
             $event->load('createdBy')->loadCount(['candidates', 'judges', 'categories']);
 
@@ -249,14 +277,12 @@ class EventController extends Controller
                 return response()->json(['message' => 'Only active or completed events can be reset.'], 400);
             }
 
-            // Delete all scores for this event
             $deletedScores = Score::where('event_id', $validated['event_id'])->delete();
             Log::info("Scores deleted for event", [
                 'event_id' => $validated['event_id'],
                 'deleted_count' => $deletedScores,
             ]);
 
-            // Reset all stages to pending
             $updatedStages = Stage::where('event_id', $validated['event_id'])->update([
                 'status' => 'pending',
                 'top_candidates_count' => null,
@@ -266,7 +292,6 @@ class EventController extends Controller
                 'updated_count' => $updatedStages,
             ]);
 
-            // Reset all categories to pending and clear current_candidate_id
             $updatedCategories = Category::where('event_id', $validated['event_id'])->update([
                 'status' => 'pending',
                 'current_candidate_id' => null,
@@ -276,7 +301,6 @@ class EventController extends Controller
                 'updated_count' => $updatedCategories,
             ]);
 
-            // Reset event status
             $event->update(['status' => 'inactive']);
             broadcast(new EventStatusUpdated($event->event_id, 'inactive'))->toOthers();
 

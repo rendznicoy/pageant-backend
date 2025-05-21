@@ -9,22 +9,18 @@ use Carbon\Carbon;
 
 class EventResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
         return [
             'event_id' => $this->event_id,
             'event_name' => $this->event_name,
+            'venue' => $this->venue, // Added
             'event_code' => $this->event_code,
             'start_date' => $this->start_date instanceof Carbon
-                ? $this->start_date->toDateTimeString() // Include time
+                ? $this->start_date->toDateTimeString()
                 : Carbon::parse($this->start_date)->toDateTimeString(),
             'end_date' => $this->end_date instanceof Carbon
-                ? $this->end_date->toDateTimeString() // Include time
+                ? $this->end_date->toDateTimeString()
                 : Carbon::parse($this->end_date)->toDateTimeString(),
             'status' => $this->status,
             'cover_photo' => $this->cover_photo ? Storage::url('public/' . $this->cover_photo) : null,
@@ -42,11 +38,11 @@ class EventResource extends JsonResource
             'judges_count' => $this->whenCounted('judges', fn() => $this->judges_count),
             'categories_count' => $this->whenCounted('categories', fn() => $this->categories_count),
             'created_at' => $this->created_at instanceof Carbon
-            ? $this->created_at->toIso8601String()
-            : ($this->created_at ? Carbon::parse($this->created_at)->toIso8601String() : null),
+                ? $this->created_at->toIso8601String()
+                : ($this->created_at ? Carbon::parse($this->created_at)->toIso8601String() : null),
             'updated_at' => $this->updated_at instanceof Carbon
-            ? $this->updated_at->toIso8601String()
-            : ($this->updated_at ? Carbon::parse($this->updated_at)->toIso8601String() : null),
+                ? $this->updated_at->toIso8601String()
+                : ($this->updated_at ? Carbon::parse($this->updated_at)->toIso8601String() : null),
         ];
     }
 }

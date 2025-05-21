@@ -73,7 +73,31 @@ class DatabaseSeeder extends Seeder
             ]));
         }
 
-        // Create 10 Candidate Pairs (10 male + 10 female), each pair with unique team
+        $statusMap = ['finalized', 'finalized', 'finalized'];
+        $activeCount = 3;
+
+        /* $statusMap = ['finalized', 'finalized', 'pending'];
+        $activeCount = 5; */
+
+        /* $statusMap = ['finalized', 'pending', 'pending'];
+        $activeCount = 10; */
+
+        /* $statusMap = ['pending', 'pending', 'pending'];
+        $activeCount = 20; */
+
+        // Create 3 Stages, all finalized
+        $stageNames = ['Preliminary', 'Swimsuit Show', 'Evening Gown'];
+        $stages = collect();
+
+        foreach ($stageNames as $i => $name) {
+            $stages->push(Stage::create([
+                'event_id' => $event->event_id,
+                'stage_name' => $name,
+                'status' => $statusMap[$i],
+            ]));
+        }
+
+        // Candidate creation logic
         $candidates = collect();
         foreach (range(1, 10) as $num) {
             $teamName = "Team Pair {$num}";
@@ -85,6 +109,7 @@ class DatabaseSeeder extends Seeder
                 'last_name' => 'Candidate',
                 'sex' => 'male',
                 'team' => $teamName,
+                'is_active' => $num <= $activeCount ? 1 : 0,
                 'photo' => null,
             ]));
 
@@ -95,22 +120,12 @@ class DatabaseSeeder extends Seeder
                 'last_name' => 'Candidate',
                 'sex' => 'female',
                 'team' => $teamName,
+                'is_active' => $num <= $activeCount ? 1 : 0,
                 'photo' => null,
             ]));
         }
 
-        // Create 3 Stages
-        $stageNames = ['Preliminary', 'Swimsuit Show', 'Evening Gown'];
-        $stages = collect();
-        foreach ($stageNames as $index => $name) {
-            $stages->push(Stage::create([
-                'event_id' => $event->event_id,
-                'stage_name' => $name,
-                'status' => $index === 0 ? 'finalized' : 'pending',
-            ]));
-        }
-
-        // Create 4 Categories per Stage
+        // Create 4 Finalized Categories per Stage
         $categoryNames = ['Beauty & Physique', 'Swim Wear', 'Formal Wear', 'Q & A'];
         $categories = collect();
 
@@ -127,22 +142,22 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // Fill Scores for Finalized Stage only
-        $finalStage = $stages->firstWhere('status', 'finalized');
-        $finalCategories = $categories->where('stage_id', $finalStage->stage_id);
-
+        // Fill Scores for All Finalized Stages
         foreach ($judges as $judge) {
             foreach ($candidates as $candidate) {
-                foreach ($finalCategories as $category) {
-                    Score::create([
-                        'event_id' => $event->event_id,
-                        'judge_id' => $judge->judge_id,
-                        'stage_id' => $finalStage->stage_id,
-                        'category_id' => $category->category_id,
-                        'candidate_id' => $candidate->candidate_id,
-                        'score' => rand(60, 100),
-                        'status' => 'confirmed',
-                    ]);
+                foreach ($stages->where('status', 'finalized') as $stage) {
+                    $stageCategories = $categories->where('stage_id', $stage->stage_id);
+                    foreach ($stageCategories as $category) {
+                        Score::create([
+                            'event_id' => $event->event_id,
+                            'judge_id' => $judge->judge_id,
+                            'stage_id' => $stage->stage_id,
+                            'category_id' => $category->category_id,
+                            'candidate_id' => $candidate->candidate_id,
+                            'score' => rand(60, 100),
+                            'status' => 'confirmed',
+                        ]);
+                    }
                 }
             }
         }

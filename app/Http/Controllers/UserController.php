@@ -10,6 +10,8 @@ use App\Http\Requests\UserRequest\DestroyUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
@@ -41,11 +43,15 @@ class UserController extends Controller
 
     public function show(Request $request) 
     {
-        /* $validated = $request->validated();
-
-        $user = User::where('user_id', $validated['user_id'])->firstOrFail(); */
-
-        return new UserResource($request->user());
+        $user = $request->user();
+        // Check if profile_photo is a Google URL and proxy it if needed
+        if ($user->profile_photo && filter_var($user->profile_photo, FILTER_VALIDATE_URL) && strpos($user->profile_photo, 'google') !== false) {
+            $localPath = $this->proxyGoogleProfilePhoto($user->profile_photo);
+            if ($localPath) {
+                $user->profile_photo = $localPath; // Update with local path
+            }
+        }
+        return new UserResource($user);
     }
 
     public function update(UpdateUserRequest $request, $user_id) 
@@ -98,12 +104,13 @@ class UserController extends Controller
             $data['profile_photo'] = 'uploads/profile_photos/' . $filename;
         }
 
-        User::update($data);
+        $user = User::find($user->user_id); // Get the actual model instance
+        $user->update($data);
 
         return response()->json([
             'success' => true,
             'message' => 'Profile updated successfully.',
-            'user' => $user,
+            'user' => new UserResource($user),
         ]);
     }
 
@@ -145,5 +152,25 @@ class UserController extends Controller
             'success' => $success,
             'failed' => $failed,
         ]);
+    }
+
+    protected function proxyGoogleProfilePhoto($googleUrl)
+    {
+        try {
+            $filename = 'google_' . time() . '.jpg';
+            $localPath = 'uploads/profile_photos/' . $filename;
+
+            // Download and save the image
+            $imageContent = file_get_contents($googleUrl);
+            if ($imageContent === false) {
+                return null; // Failed to fetch
+            }
+
+            file_put_contents(public_path($localPath), $imageContent);
+            return $localPath;
+        } catch (\Exception $e) {
+            Log::error('Failed to proxy Google profile photo: ' . $e->getMessage());
+            return null;
+        }
     }
 }

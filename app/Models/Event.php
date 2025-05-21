@@ -16,6 +16,7 @@ class Event extends Model
 
     protected $fillable = [
         'event_name',
+        'venue', // Added
         'event_code',
         'start_date',
         'end_date',
@@ -36,8 +37,6 @@ class Event extends Model
         'last_accessed' => 'datetime',
     ];
 
-    // Add accessors to format dates correctly for API responses
-    // This ensures dates are returned with timezone information
     public function getStartDateAttribute($value)
     {
         return $value ? Carbon::parse($value)->toISOString() : null;
@@ -62,8 +61,6 @@ class Event extends Model
     {
         return $value ? Carbon::parse($value)->toISOString() : null;
     }
-
-    // Relationships
 
     public function createdBy()
     {
@@ -92,6 +89,6 @@ class Event extends Model
 
     protected function serializeDate(\DateTimeInterface $date)
     {
-        return $date->format('Y-m-d\TH:i:s.u\Z'); // ISO8601 format with UTC timezone
+        return $date->format('Y-m-d\TH:i:s.u\Z');
     }
 }

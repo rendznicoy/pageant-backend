@@ -122,6 +122,7 @@ Route::prefix('v1')->group(function () {
             Route::post('submit-score', [ScoreController::class, 'submit']);
             Route::post('confirm-score', [ScoreController::class, 'confirm']);
             Route::get('final-results', [ScoreController::class, 'finalResults']);
+            Route::get('/judge/score-status', [JudgeController::class, 'scoreStatus']);
         });
     });
 });
