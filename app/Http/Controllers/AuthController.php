@@ -190,16 +190,28 @@ class AuthController extends Controller
 
             // Determine role
             $role = $email === '21-1-01027@vsu.edu.ph' ? 'admin' : 'tabulator';
+            
+            // Get Google profile photo URL
+            $profilePhotoUrl = $googleUser->getAvatar();
+            
+            // Some Google avatars include size parameters - let's make sure we get a decent size
+            if ($profilePhotoUrl && strpos($profilePhotoUrl, 'googleusercontent.com') !== false) {
+                // Remove any existing size parameters
+                $profilePhotoUrl = preg_replace('/=s\d+-c/', '', $profilePhotoUrl);
+                // Add our own size parameter for a larger image
+                $profilePhotoUrl .= '=s400-c';
+            }
 
             // Check if user already exists
             $existingUser = User::where('email', $email)->first();
 
             if ($existingUser) {
-                // Update Google ID, role, and mark email verified
+                // Update Google ID, role, profile photo and mark email verified
                 $existingUser->update([
                     'google_id' => $googleUser->id,
                     'role' => $role,
                     'email_verified_at' => now(),
+                    'profile_photo' => $profilePhotoUrl,
                 ]);
                 Auth::login($existingUser);
             } else {
@@ -213,12 +225,13 @@ class AuthController extends Controller
                     'password' => Hash::make(Str::random(12)),
                     'role' => $role,
                     'email_verified_at' => now(),
+                    'profile_photo' => $profilePhotoUrl,
                 ]);
                 Auth::login($newUser);
             }
 
             // Use a hardcoded frontend URL temporarily to test if env() is the issue
-            $frontendUrl = 'http://localhost:5173';
+            $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
             
             // Construct redirect path
             $redirectPath = $role === 'admin' ? '/admin/dashboard' : '/tabulator/dashboard';
@@ -227,6 +240,11 @@ class AuthController extends Controller
             return redirect($frontendUrl . $redirectPath);
 
         } catch (\Exception $e) {
+            // Log the error for debugging
+            Log::error('Google authentication error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             // Redirect with hardcoded URL to avoid env() issues
             return redirect('http://localhost:5173/login/admin?error=google_auth_failed');
         }

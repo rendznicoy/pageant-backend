@@ -265,7 +265,7 @@ class CategoryController extends Controller
             return response()->json(['message' => 'Failed to set candidate'], 500);
         }
 
-        broadcast(new CandidateSet($event_id, $candidate_id))->toOthers();
+        broadcast(new CandidateSet($event_id, $category_id, $candidate_id))->toOthers();
         return response()->json(['message' => 'Candidate set successfully']);
     }
 

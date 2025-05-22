@@ -1,10 +1,12 @@
 <?php
+
 namespace App\Http\Requests\EventRequest;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class UpdateEventRequest extends FormRequest
 {
@@ -13,10 +15,9 @@ class UpdateEventRequest extends FormRequest
         $user = auth()->user();
         $isAuthorized = $user && in_array($user->role, ['admin', 'tabulator']);
         if (!$isAuthorized) {
-            Log::warning('Unauthorized attempt to update event', [
+            Log::warning('Unauthorized update attempt.', [
                 'user_id' => $user?->user_id,
                 'role' => $user?->role,
-                'event_id' => $this->route('event_id'),
             ]);
         }
         return $isAuthorized;
@@ -24,36 +25,52 @@ class UpdateEventRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        Log::info('Preparing validation for update event', [
-            'input' => $this->all(),
-            'event_id' => $this->event_id,
-        ]);
+        $raw = $this->request; // Access Symfony's underlying input bag
 
-        // Ensure event_id is included
-        if ($this->has('event_id')) {
-            $this->merge(['event_id' => $this->event_id]);
+        $eventName = $raw->get('event_name');
+        $venue = $raw->get('venue');
+        $description = $raw->get('description');
+        $start = $raw->get('start_date');
+        $end = $raw->get('end_date');
+
+        try {
+            $this->merge([
+                'event_name' => $eventName,
+                'venue' => $venue,
+                'description' => $description,
+                'start_date' => $start ? \Carbon\Carbon::parse($start)->format('Y-m-d H:i:s') : null,
+                'end_date' => $end ? \Carbon\Carbon::parse($end)->format('Y-m-d H:i:s') : null,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('prepareForValidation error:', [
+                'error' => $e->getMessage(),
+                'start_date_raw' => $start,
+                'end_date_raw' => $end,
+            ]);
         }
+
+        Log::info('After prepareForValidation (using $this->request->get()):', $this->all());
     }
 
     public function rules(): array
     {
         return [
-            'event_id' => ['required', 'exists:events,event_id'],
-            'event_name' => ['sometimes', 'string', 'max:255'],
-            'event_code' => ['sometimes', 'string', 'max:255'],
-            'start_date' => ['sometimes', 'date'],
-            'end_date' => ['sometimes', 'date', 'after_or_equal:start_date'],
-            'description' => ['sometimes', 'string', 'nullable'],
-            'cover_photo' => ['sometimes', 'image', 'mimes:jpeg,png,jpg,gif', 'max:5120'], // 5MB max
+            'event_name' => 'required|string|max:255',
+            'venue' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'cover_photo' => 'nullable|image|max:2048',
         ];
     }
 
     protected function failedValidation(Validator $validator)
     {
-        Log::error('Update event validation failed', [
+        Log::error('Validation failed.', [
             'errors' => $validator->errors()->all(),
             'input' => $this->all(),
         ]);
+
         throw new HttpResponseException(response()->json([
             'success' => false,
             'message' => 'Update event request failed validation.',

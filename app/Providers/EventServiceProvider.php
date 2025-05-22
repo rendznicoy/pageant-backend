@@ -15,6 +15,9 @@ class EventServiceProvider extends ServiceProvider
      * @var array<class-string, array<int, class-string>>
      */
     protected $listen = [
+        \App\Events\ScoreConfirmed::class => [
+            \App\Listeners\AdvanceCandidate::class,
+        ],
         Registered::class => [
             SendEmailVerificationNotification::class,
         ],
