@@ -54,6 +54,7 @@ Route::prefix('v1')->group(function () {
             Route::post('{event_id}/start', [EventController::class, 'start']);
             Route::post('{event_id}/finalize', [EventController::class, 'finalize']);
             Route::post('{event_id}/reset', [EventController::class, 'reset']);
+            Route::patch('{event_id}/division', [EventController::class, 'changeDivision']);
 
             Route::prefix('{event_id}')->group(function () {
                 Route::prefix('stages')->group(function () {
@@ -90,6 +91,7 @@ Route::prefix('v1')->group(function () {
                     Route::get('{candidate_id}', [CandidateController::class, 'show']);
                     Route::patch('{candidate_id}/edit', [CandidateController::class, 'update']);
                     Route::delete('{candidate_id}', [CandidateController::class, 'destroy']);
+                    Route::post('/api/v1/events/{id}/candidates/reset', [CandidateController::class, 'resetCandidates']);
                 });
 
                 Route::prefix('judges')->group(function () {

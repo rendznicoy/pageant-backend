@@ -25,12 +25,13 @@ class StoreEventRequest extends FormRequest
     {
         return [
             'event_name' => 'required|string|max:255',
-            'event_code' => 'required|string|max:255|unique:events,event_code',
-            'venue' => 'nullable|string|max:255',
+            'venue' => 'required|string|max:255',
             'start_date' => 'required|date_format:Y-m-d H:i:s',
             'end_date' => 'required|date_format:Y-m-d H:i:s|after_or_equal:start_date',
             'description' => 'nullable|string',
             'cover_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
+            'division' => 'required|in:standard,male-only,female-only',
+            'created_by' => 'required|exists:users,user_id', // ✅ ADD THIS LINE
         ];
     }
 

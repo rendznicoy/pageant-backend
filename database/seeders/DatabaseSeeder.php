@@ -41,11 +41,11 @@ class DatabaseSeeder extends Seeder
         // Create Event
         $event = Event::create([
             'event_name' => 'Grand Pageant 2025',
-            'event_code' => 'GP2025',
             'start_date' => Carbon::now(),
             'end_date' => Carbon::now()->addDays(2),
             'description' => 'A prestigious event highlighting beauty, intelligence, and grace.',
             'status' => 'active',
+            'division' => 'standard',
             'created_by' => $tabulator->user_id,
             'cover_photo' => null,
         ]);

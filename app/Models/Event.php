@@ -17,15 +17,14 @@ class Event extends Model
     protected $fillable = [
         'event_name',
         'venue', // Added
-        'event_code',
         'start_date',
         'end_date',
         'status',
         'created_by',
-        'last_accessed',
         'is_starred',
         'cover_photo',
         'description',
+        'division',
     ];
 
     protected $casts = [
@@ -34,7 +33,6 @@ class Event extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
-        'last_accessed' => 'datetime',
     ];
 
     public function getStartDateAttribute($value)

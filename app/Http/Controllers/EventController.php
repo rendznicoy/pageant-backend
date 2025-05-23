@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use App\Models\Score;
+use App\Models\Candidate;
 
 class EventController extends Controller
 {
@@ -92,7 +93,6 @@ class EventController extends Controller
             $validated = $request->validated();
             $event = Event::where('event_id', $validated['event_id'])->firstOrFail();
             
-            $event->last_accessed = now();
             $event->save();
 
             $event->load('createdBy')->loadCount(['candidates', 'judges', 'categories']);
@@ -114,7 +114,7 @@ class EventController extends Controller
             $validated = $request->validated();
             $event = Event::findOrFail($event_id);
             $updateData = [];
-            $fields = ['event_name', 'venue', 'description', 'start_date', 'end_date'];
+            $fields = ['event_name', 'venue', 'description', 'start_date', 'end_date', 'division'];
 
             foreach ($fields as $field) {
                 if (in_array($field, ['start_date', 'end_date']) && isset($validated[$field])) {
@@ -338,5 +338,31 @@ class EventController extends Controller
             ]);
             return response()->json(['message' => 'Failed to toggle star'], 500);
         }
+    }
+
+    public function changeDivision(Request $request, $event_id)
+    {
+        $request->validate([
+            'division' => 'required|in:standard,male-only,female-only',
+        ]);
+
+        $event = Event::findOrFail($event_id);
+
+        if ($event->division === $request->division) {
+            return response()->json([
+                'message' => 'Division is already set to ' . $request->division,
+            ], 200);
+        }
+
+        $event->update(['division' => $request->division]);
+
+        // Reset candidates
+        Score::where('event_id', $event_id)->delete();
+        Candidate::where('event_id', $event_id)->delete();
+
+        return response()->json([
+            'message' => 'Division updated and candidates reset.',
+            'event' => new EventResource($event),
+        ], 200);
     }
 }

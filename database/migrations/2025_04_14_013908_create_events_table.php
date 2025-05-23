@@ -14,15 +14,14 @@ return new class extends Migration
         Schema::create('events', function (Blueprint $table) {
             $table->id('event_id');
             $table->string('event_name');
-            $table->string('event_code')->unique();
             $table->string('venue')->nullable();
             $table->datetime('start_date')->nullable();
             $table->datetime('end_date')->nullable();
             $table->enum('status', ['inactive', 'active', 'completed'])->default('inactive');
-            $table->timestamp('last_accessed')->nullable();
             $table->boolean('is_starred')->default(false);
             $table->string('cover_photo')->nullable();
             $table->text('description')->nullable();
+            $table->enum('division', ['standard', 'male-only', 'female-only'])->default('standard');
             $table->foreignId('created_by')->constrained('users', 'user_id')->onDelete('cascade');
             $table->timestamps();
         });
