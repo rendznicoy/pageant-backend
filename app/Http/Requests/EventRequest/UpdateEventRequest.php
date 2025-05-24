@@ -62,6 +62,9 @@ class UpdateEventRequest extends FormRequest
             'description' => 'nullable|string',
             'division' => 'sometimes|required|in:standard,male-only,female-only',
             'cover_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
+            'statisticians' => 'sometimes|array|min:1',
+            'statisticians.*.id' => 'nullable|integer',
+            'statisticians.*.name' => 'sometimes|string',
         ];
     }
 

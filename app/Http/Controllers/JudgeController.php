@@ -163,63 +163,36 @@ class JudgeController extends Controller
     {
         $user = auth()->user();
         if (!$user) {
-            Log::error("No authenticated user found in currentSession", [
-                'path' => $request->path(),
-                'headers' => $request->headers->all(),
-                'token' => $request->bearerToken(),
-            ]);
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
         $judgeEntry = Judge::where('user_id', $user->user_id)->first();
         if (!$judgeEntry) {
-            Log::warning("No judge entry found for user", [
-                'user_id' => $user->user_id,
-                'email' => $user->email,
-            ]);
             return response()->json(['message' => 'No judge entry assigned'], 404);
         }
-
-        Log::info("JudgeController::currentSession called", [
-            'judge_id' => $judgeEntry->judge_id,
-            'user_id' => $user->user_id,
-            'judge_role' => $user->role,
-            'judge_email' => $user->email,
-            'judge_username' => $user->username,
-            'auth_check' => auth()->check(),
-            'token' => Str::limit($request->bearerToken(), 20),
-        ]);
 
         $event = Event::whereHas('judges', function ($query) use ($user) {
             $query->where('user_id', $user->user_id);
         })->first();
         if (!$event) {
-            Log::warning("No event assigned to judge", [
-                'judge_id' => $judgeEntry->judge_id,
-                'user_id' => $user->user_id,
-                'judge_email' => $user->email,
-            ]);
             return response()->json(['message' => 'No event assigned'], 404);
         }
-
-        Log::info("Event found for judge", [
-            'event_id' => $event->event_id,
-            'event_name' => $event->event_name,
-            'event_status' => $event->status,
-        ]);
 
         $currentCategory = Category::where('event_id', $event->event_id)
             ->where('status', 'active')
             ->with('stage')
             ->first();
+            
         $nextCandidate = $currentCategory
             ? Candidate::where('event_id', $event->event_id)
-                ->where('is_active', true)
                 ->where('candidate_id', $currentCategory->current_candidate_id)
                 ->first()
             : null;
 
         $scoreStatus = 'none';
+        $scoreData = null;
+
+        // Only check for scores if we have both a candidate and category
         if ($nextCandidate && $currentCategory) {
             $score = Score::findByCompositeKey([
                 'judge_id' => $judgeEntry->judge_id,
@@ -227,21 +200,30 @@ class JudgeController extends Controller
                 'category_id' => $currentCategory->category_id,
                 'event_id' => $event->event_id,
             ]);
-            $scoreStatus = $score ? $score->status : 'none';
-            Log::info("Score status for judge", [
-                'judge_id' => $judgeEntry->judge_id,
-                'candidate_id' => $nextCandidate->candidate_id,
-                'category_id' => $currentCategory->category_id,
-                'event_id' => $event->event_id,
-                'score_status' => $scoreStatus,
-            ]);
+            
+            // Extra protection - ensure score matches current candidate
+            if ($score && $score->candidate_id !== $nextCandidate->candidate_id) {
+                Log::warning("Mismatched candidate in score lookup", [
+                    'expected_candidate_id' => $nextCandidate->candidate_id,
+                    'actual_candidate_id' => $score->candidate_id,
+                ]);
+                $score = null;
+            }
+            
+            if ($score) {
+                $scoreStatus = $score->status; // 'temporary' or 'confirmed'
+                $scoreData = [
+                    'score' => $score->score,
+                    'comments' => $score->comments,
+                ];
+            }
         }
 
         return response()->json([
             'event' => [
                 'event_id' => $event->event_id,
                 'event_name' => $event->event_name,
-                'venue' => $event->venue, // Added
+                'venue' => $event->venue,
                 'status' => $event->status,
             ],
             'judge_name' => $user->first_name . ' ' . $user->last_name,
@@ -266,14 +248,11 @@ class JudgeController extends Controller
                 'first_name' => $nextCandidate->first_name,
                 'last_name' => $nextCandidate->last_name,
                 'team' => $nextCandidate->team,
-                'photo' => $nextCandidate->photo,
+                'photo' => $nextCandidate->photo ? Storage::url($nextCandidate->photo) : null,
             ] : null,
-            'criteria' => $currentCategory ? [[
-                'id' => $currentCategory->category_id,
-                'name' => $currentCategory->category_name,
-                'max_score' => $currentCategory->max_score,
-            ]] : [],
             'score_status' => $scoreStatus,
+            'score' => $scoreData['score'] ?? null,
+            'comments' => $scoreData['comments'] ?? null,
         ]);
     }
 }

@@ -120,10 +120,9 @@ class CategoryController extends Controller
         try {
             $updated = $category->update(['status' => 'active']);
             $category->refresh();
-            Log::info("Category update attempted", [
-                'category_id' => $category_id,
-                'updated' => $updated,
-                'new_status' => $category->status,
+            Log::info("After candidate set, current candidate is now:", [
+                'category_id' => $category->category_id,
+                'current_candidate_id' => $category->current_candidate_id,
             ]);
 
             if (!$updated || $category->status !== 'active') {
@@ -150,18 +149,21 @@ class CategoryController extends Controller
         ]);
 
         $category = Category::where('event_id', $event_id)->findOrFail($category_id);
-        if ($category->status !== 'active') {
-            Log::warning("Category is not active", ['category_status' => $category->status]);
-            return response()->json(['message' => 'Category is not active'], 400);
+
+        if (!in_array($category->status, ['active', 'finalized'])) {
+            Log::warning("Category is neither active nor finalized", ['category_status' => $category->status]);
+            return response()->json(['message' => 'Only active or finalized categories can be reset'], 400);
         }
 
         try {
+            // Clear associated scores
             $deletedScores = Score::where('category_id', $category_id)->delete();
             Log::info("Scores deleted for category", [
                 'category_id' => $category_id,
                 'deleted_count' => $deletedScores,
             ]);
 
+            // Reset the category's status and current candidate
             $updated = $category->update([
                 'status' => 'pending',
                 'current_candidate_id' => null,
@@ -179,6 +181,7 @@ class CategoryController extends Controller
                 return response()->json(['message' => 'Failed to reset category status'], 500);
             }
 
+            // Trigger real-time event update
             broadcast(new CategoryStatusUpdated($category_id, 'pending', $event_id))->toOthers();
             return response()->json(['message' => 'Category reset successfully']);
         } catch (\Exception $e) {
@@ -297,7 +300,7 @@ class CategoryController extends Controller
         }
 
         $category->update(['status' => 'finalized', 'current_candidate_id' => null]);
-        broadcast(new CategoryStatusUpdated($event_id, $category_id, 'finalized'))->toOthers();
+        broadcast(new CategoryStatusUpdated($category_id, 'finalized', $event_id))->toOthers();
 
         return response()->json(['message' => 'Category finalized successfully']);
     }

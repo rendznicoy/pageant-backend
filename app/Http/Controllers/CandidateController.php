@@ -17,11 +17,16 @@ use Illuminate\Support\Facades\Storage;
 class CandidateController extends Controller
 {
     public function index(Request $request, $event_id) {
-        $query = Candidate::where('event_id', $event_id); // ✅ fetch all regardless of status
+        $query = Candidate::where('event_id', $event_id);
         if ($request->has('sex')) {
             $query->where('sex', $request->query('sex'));
         }
+    
         $candidates = $query->get();
+    
+        // 👇 Add this to debug the raw DB values
+        Log::info('Fetched candidates raw from DB', $candidates->toArray());
+    
         return response()->json(['data' => CandidateResource::collection($candidates)]);
     }
 

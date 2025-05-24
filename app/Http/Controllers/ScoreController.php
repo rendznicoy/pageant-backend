@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Models\Candidate;
+use App\Events\CandidateSet;
 
 class ScoreController extends Controller
 {
@@ -344,27 +346,25 @@ class ScoreController extends Controller
                     'status' => 'confirmed',
                     'updated_at' => now(),
                 ]);
+            
+                // ✅ Check if all judges have confirmed for this candidate and category
+                $allConfirmed = Score::where('event_id', $request->event_id)
+                    ->where('category_id', $request->category_id)
+                    ->where('candidate_id', $request->candidate_id)
+                    ->where('status', 'confirmed')
+                    ->count() === Judge::where('event_id', $request->event_id)->count();
+            
+                    if ($allConfirmed) {
+                        Log::info("All judges confirmed. Waiting for admin/tabulator to assign next candidate.", [
+                            'event_id' => $request->event_id,
+                            'category_id' => $request->category_id,
+                        ]);
+                    }
+            
                 DB::commit();
                 broadcast(new ScoreConfirmed($request->event_id, $score->getKey(), $score))->toOthers();
-                Log::info("Score confirmed successfully", [
-                    'judge_id' => $judge->judge_id,
-                    'user_id' => $user->user_id,
-                    'score_id' => $score->getKey(),
-                ]);
+            
                 return response()->json(['message' => 'Score confirmed successfully']);
-            } else {
-                $score->update([
-                    'score' => $request->score,
-                    'comments' => $request->comments,
-                    'status' => 'temporary',
-                    'updated_at' => now(),
-                ]);
-                DB::commit();
-                Log::info("Score updated as temporary", [
-                    'judge_id' => $judge->judge_id,
-                    'user_id' => $user->user_id,
-                ]);
-                return response()->json(['message' => 'Score updated. Please resubmit for confirmation']);
             }
         } catch (\Exception $e) {
             DB::rollBack();

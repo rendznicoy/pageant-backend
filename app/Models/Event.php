@@ -21,10 +21,10 @@ class Event extends Model
         'end_date',
         'status',
         'created_by',
-        'is_starred',
         'cover_photo',
         'description',
         'division',
+        'statisticians',
     ];
 
     protected $casts = [
@@ -33,6 +33,7 @@ class Event extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
+        'statisticians' => 'array',
     ];
 
     public function getStartDateAttribute($value)

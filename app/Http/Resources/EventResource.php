@@ -13,10 +13,8 @@ class EventResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        // Load judges with users
         $judges = Judge::where('event_id', $this->event_id)->with('user')->get();
 
-        // Determine judges with pending scores
         $pendingJudges = [];
         foreach ($this->categories as $category) {
             if (!$category->current_candidate_id) continue;
@@ -50,10 +48,9 @@ class EventResource extends JsonResource
                 ? $this->end_date->toDateTimeString()
                 : Carbon::parse($this->end_date)->toDateTimeString(),
             'status' => $this->status,
-            'division' => $this->division, // ✅ Add this line
+            'division' => $this->division,
             'cover_photo' => $this->cover_photo ? Storage::url('public/' . $this->cover_photo) : null,
             'description' => $this->description,
-            'is_starred' => $this->is_starred,
             'created_by' => $this->whenLoaded('createdBy', fn() => [
                 'user_id' => $this->createdBy?->user_id,
                 'first_name' => $this->createdBy?->first_name,
@@ -62,10 +59,9 @@ class EventResource extends JsonResource
             'candidates_count' => $this->whenCounted('candidates', fn() => $this->candidates_count),
             'judges_count' => $this->whenCounted('judges', fn() => $this->judges_count),
             'categories_count' => $this->whenCounted('categories', fn() => $this->categories_count),
-        
-            // New
             'active_categories_count' => $this->categories()->where('status', 'active')->count(),
             'judges_with_pending_scores' => $pendingJudges,
-        ];        
+            'statisticians' => $this->statisticians,
+        ];
     }
-}
+    }

@@ -21,6 +21,14 @@ class StoreEventRequest extends FormRequest
         return $isAuthorized;
     }
 
+    protected function prepareForValidation()
+    {
+        if ($this->has('statisticians') && is_string($this->statisticians)) {
+            $decoded = json_decode($this->statisticians, true);
+            $this->merge(['statisticians' => $decoded]);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -31,7 +39,10 @@ class StoreEventRequest extends FormRequest
             'description' => 'nullable|string',
             'cover_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
             'division' => 'required|in:standard,male-only,female-only',
-            'created_by' => 'required|exists:users,user_id', // ✅ ADD THIS LINE
+            'statisticians' => 'required|array|min:1',
+            'statisticians.*.id' => 'nullable|integer',
+            'statisticians.*.name' => 'required|string',
+            'created_by' => 'required|exists:users,user_id',
         ];
     }
 

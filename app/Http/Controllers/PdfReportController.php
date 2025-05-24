@@ -56,9 +56,10 @@ class PdfReportController extends Controller
         return $pdf->download($filename);
     }
 
-    public function preview(DownloadReportRequest $request, $event_id)
+    public function preview(DownloadReportRequest $request)
     {
         try {
+            $event_id = $request->event_id; // comes from merged route param
             $validated = $request->validated();
             Log::info('event_id received:', ['event_id' => $validated['event_id']]);
            // Use the path variable directly
@@ -105,9 +106,12 @@ class PdfReportController extends Controller
                 ->header('Content-Disposition', 'inline; filename="event_preview.pdf"')
                 ->header('Cache-Control', 'private, max-age=0, must-revalidate')
                 ->header('Pragma', 'public');
-        } catch (\Exception $e) {
-            Log::error('PDF preview failed', ['error' => $e->getMessage()]);
-            return response('Failed to generate preview', 500);
+        } catch (\Throwable $e) {
+            Log::error('PDF preview failed', ['exception' => $e]);
+            return response()->json([
+                'message' => 'Failed to generate preview.',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 }

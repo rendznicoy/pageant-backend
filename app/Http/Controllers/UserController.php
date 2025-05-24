@@ -19,13 +19,16 @@ class UserController extends Controller
     {
         $query = User::query();
 
-        if ($request->has('role')) {
+        if ($request->has('roles')) {
+            $roles = explode(',', $request->query('roles'));
+            $query->whereIn('role', $roles);
+        } elseif ($request->has('role')) {
             $query->where('role', $request->query('role'));
         }
 
         $users = $query->get();
 
-        return response()->json(UserResource::collection($users));
+        return UserResource::collection($users);
     }
 
     public function store(StoreUserRequest $request)
@@ -43,7 +46,8 @@ class UserController extends Controller
 
     public function show(Request $request) 
     {
-        $user = $request->user();
+        $user = $request->user()->fresh();
+        Log::info('User from token:', ['user' => $user]);
 
         // Proxy Google profile photo to local storage if needed
         if (
@@ -60,7 +64,7 @@ class UserController extends Controller
         Log::info('Final profile photo path:', ['photo' => $user->profile_photo]);
 
         return response()->json([
-            'data' => new UserResource($user)
+            'data' => new UserResource($user),
         ]);
     }
 

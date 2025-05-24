@@ -45,7 +45,7 @@ class EventController extends Controller
     {
         try {
             $validated = $request->validated();
-            
+
             if ($request->hasFile('cover_photo')) {
                 $file = $request->file('cover_photo');
                 if ($file->isValid()) {
@@ -57,16 +57,16 @@ class EventController extends Controller
             }
 
             $event = Event::create(array_merge($validated, ['status' => 'inactive']));
-            
-            $stage = Stage::create([
+
+            Stage::create([
                 'event_id' => $event->event_id,
                 'stage_name' => 'Default Stage',
                 'status' => 'pending',
             ]);
-            
+
             Category::create([
                 'event_id' => $event->event_id,
-                'stage_id' => $stage->stage_id,
+                'stage_id' => $event->stages()->first()->stage_id,
                 'category_name' => 'Default Category',
                 'status' => 'pending',
                 'current_candidate_id' => null,
@@ -78,6 +78,11 @@ class EventController extends Controller
                 'message' => 'Event created successfully with default stage and category.',
                 'event' => new EventResource($event)
             ], 201);
+            Log::debug('Failed validation', [
+                'statisticians_raw' => $this->input('statisticians'),
+                'parsed' => json_decode($this->input('statisticians'), true),
+                'all_input' => $this->all(),
+            ]);
         } catch (\Exception $e) {
             Log::error('Failed to create event: ' . $e->getMessage(), [
                 'user_id' => auth()->id(),
@@ -113,6 +118,7 @@ class EventController extends Controller
         try {
             $validated = $request->validated();
             $event = Event::findOrFail($event_id);
+
             $updateData = [];
             $fields = ['event_name', 'venue', 'description', 'start_date', 'end_date', 'division'];
 
@@ -122,12 +128,11 @@ class EventController extends Controller
                     $existing = $event->$field
                         ? Carbon::parse($event->$field)->utc()->format('Y-m-d H:i:s')
                         : null;
-                
+
                     if ($submitted !== $existing) {
                         $updateData[$field] = $submitted;
                     }
-                }
-                 elseif (isset($validated[$field])) {
+                } elseif (isset($validated[$field])) {
                     $new = $validated[$field];
                     $old = $event->$field;
                     if ($new !== $old) {
@@ -152,14 +157,26 @@ class EventController extends Controller
                 }
             }
 
-            if (empty($updateData)) {
+            // Handle statisticians change
+            $incomingStats = $request->input('statisticians');
+            $hasChangedStatisticians = $incomingStats !== $event->statisticians;
+
+            // Save changes
+            if (empty($updateData) && !$hasChangedStatisticians) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No changes were made to the event.',
                 ], 200);
             }
 
-            $event->update($updateData);
+            if (!empty($updateData)) {
+                $event->update($updateData);
+            }
+
+            if ($hasChangedStatisticians) {
+                $event->statisticians = $incomingStats;
+                $event->save();
+            }
 
             return response()->json([
                 'success' => true,
@@ -183,6 +200,7 @@ class EventController extends Controller
         try {
             $validated = $request->validated();
             $event = Event::where('event_id', $validated['event_id'])->firstOrFail();
+            $validated['statisticians'] = json_decode($request->input('statisticians'), true);
             if ($event->cover_photo) {
                 Storage::disk('public')->delete($event->cover_photo);
             }

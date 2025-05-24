@@ -119,7 +119,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Judge-only routes
-    Route::middleware(['auth:sanctum', 'role:judge', 'no.cache'])->group(function () {
+    Route::middleware(['auth:sanctum', 'role:judge'])->group(function () {
         Route::prefix('judge')->group(function () {
             Route::get('current-session', [JudgeController::class, 'currentSession']);
             Route::get('scoring-session', [JudgeController::class, 'scoringSession']);

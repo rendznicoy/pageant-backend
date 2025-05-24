@@ -18,10 +18,10 @@ return new class extends Migration
             $table->datetime('start_date')->nullable();
             $table->datetime('end_date')->nullable();
             $table->enum('status', ['inactive', 'active', 'completed'])->default('inactive');
-            $table->boolean('is_starred')->default(false);
             $table->string('cover_photo')->nullable();
             $table->text('description')->nullable();
             $table->enum('division', ['standard', 'male-only', 'female-only'])->default('standard');
+            $table->json('statisticians')->nullable();
             $table->foreignId('created_by')->constrained('users', 'user_id')->onDelete('cascade');
             $table->timestamps();
         });
