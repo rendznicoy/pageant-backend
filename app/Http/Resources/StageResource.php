@@ -17,6 +17,7 @@ class StageResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
+            'id' => $this->stage_id, // Add this line
             'stage_id' => $this->stage_id,
             'event_id' => $this->event_id,
             'name' => $this->stage_name,

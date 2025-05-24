@@ -16,6 +16,14 @@ class UpdateStageRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'stage_id' => $this->route('stage_id'),
+            'event_id' => $this->route('event_id'),
+        ]);
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
