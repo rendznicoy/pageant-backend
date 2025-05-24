@@ -28,7 +28,7 @@ class StoreCandidateRequest extends FormRequest
             'candidate_number' => 'required|integer',
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
-            'sex' => 'required|in:male,female',
+            'sex' => 'required|in:M,F',
             'team' => 'required|string',
             'photo' => 'nullable|image|max:10240|mimes:png,jpg,jpeg',
         ];

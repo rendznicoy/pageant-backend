@@ -27,6 +27,7 @@ class Candidate extends Model
 
     protected $cast = [
         'candidate_number' => 'integer',
+        'is_active' => 'boolean',
     ];
 
     public function event()

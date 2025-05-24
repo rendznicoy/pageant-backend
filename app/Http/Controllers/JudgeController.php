@@ -16,6 +16,7 @@ use App\Models\Candidate;
 use App\Models\Score;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class JudgeController extends Controller
 {
@@ -30,7 +31,6 @@ class JudgeController extends Controller
         $data = $request->validated();
 
         $event = Event::find($data['event_id']);
-
         if (!$event) {
             return response()->json(['message' => 'Event not found.'], 404);
         }
@@ -42,6 +42,11 @@ class JudgeController extends Controller
             $username = $originalUsername . $counter++;
         }
 
+        $photoPath = null;
+        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
+            $photoPath = $request->file('photo')->store('uploads/profile_photos', 'public');
+        }
+
         $user = User::create([
             'username' => $username,
             'email' => $request->email,
@@ -49,6 +54,7 @@ class JudgeController extends Controller
             'last_name' => $request->last_name,
             'role' => 'judge',
             'password' => null,
+            'profile_photo' => $photoPath, // save path to DB
         ]);
 
         do {
@@ -81,17 +87,54 @@ class JudgeController extends Controller
 
     public function update(UpdateJudgeRequest $request)
     {
+        Log::info('Judge update full request', $request->all());
+
         $validated = $request->validated();
+
+        Log::info('Judge update validated', $validated);
 
         $judge = Judge::where('judge_id', $validated['judge_id'])
             ->where('event_id', $validated['event_id'])
             ->firstOrFail();
 
-        $judge->update($validated);
+        // Update related user
+        $user = $judge->user;
+
+        $updated = false;
+
+        if ($user->first_name !== $validated['first_name']) {
+            $user->first_name = $validated['first_name'];
+            $updated = true;
+        }
+
+        if ($user->last_name !== $validated['last_name']) {
+            $user->last_name = $validated['last_name'];
+            $updated = true;
+        }
+
+        if ($user->email !== $validated['email']) {
+            $user->email = $validated['email'];
+            $updated = true;
+        }
+
+        // Handle new profile photo
+        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
+            // Delete old if exists
+            if ($user->profile_photo && Storage::disk('public')->exists($user->profile_photo)) {
+                Storage::disk('public')->delete($user->profile_photo);
+            }
+
+            $user->profile_photo = $request->file('photo')->store('uploads/profile_photos', 'public');
+            $updated = true;
+        }
+
+        if ($updated) {
+            $user->save();
+        }
 
         return response()->json([
             'message' => 'Judge updated successfully.',
-            'judge' => new JudgeResource($judge),
+            'judge' => new JudgeResource($judge->fresh()),
         ]);
     }
 
@@ -103,72 +146,53 @@ class JudgeController extends Controller
             ->where('event_id', $validated['event_id'])
             ->firstOrFail();
 
+        $user = $judge->user; // Fetch related user
+
+        // Delete the judge first
         $judge->delete();
 
-        return response()->json(['message' => 'Judge deleted successfully.'], 204);
+        // Then delete the user (if you really want full cleanup)
+        if ($user) {
+            $user->delete();
+        }
+
+        return response()->json(['message' => 'Judge and associated user deleted successfully.'], 204);
     }
 
     public function currentSession(Request $request)
     {
         $user = auth()->user();
         if (!$user) {
-            Log::error("No authenticated user found in currentSession", [
-                'path' => $request->path(),
-                'headers' => $request->headers->all(),
-                'token' => $request->bearerToken(),
-            ]);
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
         $judgeEntry = Judge::where('user_id', $user->user_id)->first();
         if (!$judgeEntry) {
-            Log::warning("No judge entry found for user", [
-                'user_id' => $user->user_id,
-                'email' => $user->email,
-            ]);
             return response()->json(['message' => 'No judge entry assigned'], 404);
         }
-
-        Log::info("JudgeController::currentSession called", [
-            'judge_id' => $judgeEntry->judge_id,
-            'user_id' => $user->user_id,
-            'judge_role' => $user->role,
-            'judge_email' => $user->email,
-            'judge_username' => $user->username,
-            'auth_check' => auth()->check(),
-            'token' => Str::limit($request->bearerToken(), 20),
-        ]);
 
         $event = Event::whereHas('judges', function ($query) use ($user) {
             $query->where('user_id', $user->user_id);
         })->first();
         if (!$event) {
-            Log::warning("No event assigned to judge", [
-                'judge_id' => $judgeEntry->judge_id,
-                'user_id' => $user->user_id,
-                'judge_email' => $user->email,
-            ]);
             return response()->json(['message' => 'No event assigned'], 404);
         }
-
-        Log::info("Event found for judge", [
-            'event_id' => $event->event_id,
-            'event_name' => $event->event_name,
-            'event_status' => $event->status,
-        ]);
 
         $currentCategory = Category::where('event_id', $event->event_id)
             ->where('status', 'active')
             ->with('stage')
             ->first();
+            
         $nextCandidate = $currentCategory
             ? Candidate::where('event_id', $event->event_id)
-                ->where('is_active', true)
                 ->where('candidate_id', $currentCategory->current_candidate_id)
                 ->first()
             : null;
 
         $scoreStatus = 'none';
+        $scoreData = null;
+
+        // Only check for scores if we have both a candidate and category
         if ($nextCandidate && $currentCategory) {
             $score = Score::findByCompositeKey([
                 'judge_id' => $judgeEntry->judge_id,
@@ -176,21 +200,30 @@ class JudgeController extends Controller
                 'category_id' => $currentCategory->category_id,
                 'event_id' => $event->event_id,
             ]);
-            $scoreStatus = $score ? $score->status : 'none';
-            Log::info("Score status for judge", [
-                'judge_id' => $judgeEntry->judge_id,
-                'candidate_id' => $nextCandidate->candidate_id,
-                'category_id' => $currentCategory->category_id,
-                'event_id' => $event->event_id,
-                'score_status' => $scoreStatus,
-            ]);
+            
+            // Extra protection - ensure score matches current candidate
+            if ($score && $score->candidate_id !== $nextCandidate->candidate_id) {
+                Log::warning("Mismatched candidate in score lookup", [
+                    'expected_candidate_id' => $nextCandidate->candidate_id,
+                    'actual_candidate_id' => $score->candidate_id,
+                ]);
+                $score = null;
+            }
+            
+            if ($score) {
+                $scoreStatus = $score->status; // 'temporary' or 'confirmed'
+                $scoreData = [
+                    'score' => $score->score,
+                    'comments' => $score->comments,
+                ];
+            }
         }
 
         return response()->json([
             'event' => [
                 'event_id' => $event->event_id,
                 'event_name' => $event->event_name,
-                'venue' => $event->venue, // Added
+                'venue' => $event->venue,
                 'status' => $event->status,
             ],
             'judge_name' => $user->first_name . ' ' . $user->last_name,
@@ -215,14 +248,11 @@ class JudgeController extends Controller
                 'first_name' => $nextCandidate->first_name,
                 'last_name' => $nextCandidate->last_name,
                 'team' => $nextCandidate->team,
-                'photo' => $nextCandidate->photo,
+                'photo' => $nextCandidate->photo ? Storage::url($nextCandidate->photo) : null,
             ] : null,
-            'criteria' => $currentCategory ? [[
-                'id' => $currentCategory->category_id,
-                'name' => $currentCategory->category_name,
-                'max_score' => $currentCategory->max_score,
-            ]] : [],
             'score_status' => $scoreStatus,
+            'score' => $scoreData['score'] ?? null,
+            'comments' => $scoreData['comments'] ?? null,
         ]);
     }
 }

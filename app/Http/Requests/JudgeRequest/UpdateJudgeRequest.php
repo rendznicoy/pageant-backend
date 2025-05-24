@@ -32,9 +32,12 @@ class UpdateJudgeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'judge_id' => 'required|exists:judges,judge_id',
-            'event_id' => 'required|exists:events,event_id',
-            'user_id' => 'required|exists:users,user_id',
+            'judge_id'   => 'required|exists:judges,judge_id',
+            'event_id'   => 'required|exists:events,event_id',
+            'user_id'    => 'required|exists:users,user_id',
+            'first_name' => 'required|string',
+            'last_name'  => 'required|string',
+            'email'      => 'required|email',
         ];
     }
 

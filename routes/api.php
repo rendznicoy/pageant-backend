@@ -54,6 +54,7 @@ Route::prefix('v1')->group(function () {
             Route::post('{event_id}/start', [EventController::class, 'start']);
             Route::post('{event_id}/finalize', [EventController::class, 'finalize']);
             Route::post('{event_id}/reset', [EventController::class, 'reset']);
+            Route::patch('{event_id}/division', [EventController::class, 'changeDivision']);
 
             Route::prefix('{event_id}')->group(function () {
                 Route::prefix('stages')->group(function () {
@@ -90,6 +91,7 @@ Route::prefix('v1')->group(function () {
                     Route::get('{candidate_id}', [CandidateController::class, 'show']);
                     Route::patch('{candidate_id}/edit', [CandidateController::class, 'update']);
                     Route::delete('{candidate_id}', [CandidateController::class, 'destroy']);
+                    Route::post('/api/v1/events/{id}/candidates/reset', [CandidateController::class, 'resetCandidates']);
                 });
 
                 Route::prefix('judges')->group(function () {
@@ -106,6 +108,8 @@ Route::prefix('v1')->group(function () {
                     Route::get('show', [ScoreController::class, 'show']);
                     Route::patch('edit/{judge_id}/{candidate_id}/{category_id}', [ScoreController::class, 'update']);
                     Route::delete('delete', [ScoreController::class, 'destroy']);
+                    Route::get('export', [ScoreController::class, 'export']);
+                    Route::get('final-results', [ScoreController::class, 'finalResults']);
                 });
 
                 Route::get('report', [PdfReportController::class, 'download']);
@@ -115,7 +119,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Judge-only routes
-    Route::middleware(['auth:sanctum', 'role:judge', 'no.cache'])->group(function () {
+    Route::middleware(['auth:sanctum', 'role:judge'])->group(function () {
         Route::prefix('judge')->group(function () {
             Route::get('current-session', [JudgeController::class, 'currentSession']);
             Route::get('scoring-session', [JudgeController::class, 'scoringSession']);

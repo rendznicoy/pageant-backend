@@ -21,8 +21,12 @@ class StageController extends Controller
 {
     public function index(Request $request, $event_id)
     {
+        Log::info('StageController@index called', ['event_id' => $event_id]);
         $stages = Stage::where('event_id', $event_id)->with('categories')->get();
-        return response()->json(StageResource::collection($stages));
+        Log::info('Returning stages:', ['count' => $stages->count()]);
+        return response()->json([
+            'data' => StageResource::collection($stages)
+        ]);
     }
 
     public function store(StoreStageRequest $request)
@@ -209,11 +213,11 @@ class StageController extends Controller
         // Validate candidate counts by sex
         $maleCount = Candidate::where('event_id', $event_id)
             ->where('is_active', true)
-            ->where('sex', 'male')
+            ->where('sex', 'M')
             ->count();
         $femaleCount = Candidate::where('event_id', $event_id)
             ->where('is_active', true)
-            ->where('sex', 'female')
+            ->where('sex', 'F')
             ->count();
         if ($maleCount < $halfCount || $femaleCount < $halfCount) {
             return response()->json([
@@ -225,7 +229,7 @@ class StageController extends Controller
         $topMales = Score::where('scores.stage_id', $stage_id)
             ->where('scores.status', 'confirmed')
             ->join('candidates', 'scores.candidate_id', '=', 'candidates.candidate_id')
-            ->where('candidates.sex', 'male')
+            ->where('candidates.sex', 'M')
             ->groupBy('scores.candidate_id')
             ->select('scores.candidate_id', DB::raw('AVG(scores.score) as average_score'))
             ->orderBy('average_score', 'desc')
@@ -236,7 +240,7 @@ class StageController extends Controller
         $topFemales = Score::where('scores.stage_id', $stage_id)
             ->where('scores.status', 'confirmed')
             ->join('candidates', 'scores.candidate_id', '=', 'candidates.candidate_id')
-            ->where('candidates.sex', 'female')
+            ->where('candidates.sex', 'F')
             ->groupBy('scores.candidate_id')
             ->select('scores.candidate_id', DB::raw('AVG(scores.score) as average_score'))
             ->orderBy('average_score', 'desc')
@@ -315,7 +319,12 @@ class StageController extends Controller
         Log::info("Fetching partial results", ['event_id' => $event_id, 'stage_id' => $stage_id]);
         $stage = Stage::where('event_id', $event_id)->findOrFail($stage_id);
 
-        // Fetch confirmed scores with strict filters
+        // Fetch all active candidates for the event
+        $candidates = Candidate::where('event_id', $event_id)
+            ->where('is_active', true)
+            ->get();
+
+        // Fetch confirmed scores for the stage/event
         $scores = Score::where('scores.stage_id', $stage_id)
             ->where('scores.event_id', $event_id)
             ->where('scores.status', 'confirmed')
@@ -349,60 +358,47 @@ class StageController extends Controller
             ])->toArray(),
         ]);
 
-        // Validate data
-        $expectedJudges = 3;
-        $expectedCandidates = 3;
-        $judgeCount = $scores->groupBy('judge_id')->count();
-        $candidateCount = $scores->groupBy('candidate_id')->count();
-        if ($judgeCount != $expectedJudges || $candidateCount != $expectedCandidates) {
-            Log::warning("Unexpected number of judges or candidates", [
-                'judges' => $judgeCount,
-                'candidates' => $candidateCount,
-            ]);
-        }
+        // Group scores by candidate_id for fast lookup
+        $scoresByCandidate = $scores->groupBy('candidate_id');
 
-        // Group scores by candidate
-        $candidateScores = $scores->groupBy('candidate_id');
-
-        // Calculate Raw Average
         $results = [];
-        foreach ($candidateScores as $candidate_id => $scoresForCandidate) {
-            $weightedScores = $scoresForCandidate->pluck('weighted_score')->map(fn($score) => (float) $score)->toArray();
+        foreach ($candidates as $candidate) {
+            $candidateScores = $scoresByCandidate->get($candidate->candidate_id, collect());
+            $weightedScores = $candidateScores->pluck('weighted_score')->map(fn($score) => (float)$score)->toArray();
             $judgeCount = count($weightedScores);
-            $rawAverage = $judgeCount > 0 ? array_sum($weightedScores) / $judgeCount : 0;
-
-            $candidateData = $scoresForCandidate->first();
-
-            Log::debug("Raw Average calculated", [
-                'candidate_id' => $candidate_id,
-                'weighted_scores' => $weightedScores,
-                'judge_count' => $judgeCount,
-                'raw_average' => $rawAverage,
-            ]);
+            $rawAverage = $judgeCount > 0 ? array_sum($weightedScores) / $judgeCount : null;
 
             $results[] = [
-                'candidate_id' => $candidate_id,
+                'candidate_id' => $candidate->candidate_id,
                 'candidate' => [
-                    'first_name' => $candidateData->first_name,
-                    'last_name' => $candidateData->last_name,
-                    'candidate_number' => $candidateData->candidate_number,
+                    'first_name' => $candidate->first_name,
+                    'last_name' => $candidate->last_name,
+                    'candidate_number' => $candidate->candidate_number,
                 ],
-                'sex' => $candidateData->sex,
-                'raw_average' => round($rawAverage, 2), // Format to 2 decimal places
+                'sex' => $candidate->sex,
+                'raw_average' => isset($rawAverage) ? round($rawAverage, 2) : null,
             ];
         }
 
-        // Sort and rank by raw_average
-        usort($results, fn($a, $b) => $b['raw_average'] <=> $a['raw_average']);
+        // Sort by raw_average (nulls last)
+        usort($results, function($a, $b) {
+            // Nulls go last
+            if (is_null($a['raw_average'])) return 1;
+            if (is_null($b['raw_average'])) return -1;
+            return $b['raw_average'] <=> $a['raw_average'];
+        });
+
+        // Assign rank (nulls have no rank)
         $rank = 0;
         $previousScore = null;
-        foreach ($results as $index => $result) {
-            if ($previousScore === null || $previousScore != $result['raw_average']) {
+        foreach ($results as $index => &$result) {
+            if ($result['raw_average'] !== null && ($previousScore === null || $previousScore != $result['raw_average'])) {
                 $rank = $index + 1;
             }
-            $results[$index]['rank'] = $rank;
+            $result['rank'] = $result['raw_average'] !== null ? $rank : null;
             $previousScore = $result['raw_average'];
         }
+        unset($result);
 
         Log::info("Partial results response", [
             'stage_id' => $stage_id,

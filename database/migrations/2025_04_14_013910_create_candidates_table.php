@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('candidate_number');
             $table->string('first_name');
             $table->string('last_name');
-            $table->enum('sex', ['male', 'female']);
+            $table->enum('sex', ['M', 'F']);
             $table->string('team');
             $table->binary('photo')->nullable(); // BLOB
             $table->boolean('is_active')->default(true);

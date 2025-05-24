@@ -19,13 +19,16 @@ class UserController extends Controller
     {
         $query = User::query();
 
-        if ($request->has('role')) {
+        if ($request->has('roles')) {
+            $roles = explode(',', $request->query('roles'));
+            $query->whereIn('role', $roles);
+        } elseif ($request->has('role')) {
             $query->where('role', $request->query('role'));
         }
 
         $users = $query->get();
 
-        return response()->json(UserResource::collection($users));
+        return UserResource::collection($users);
     }
 
     public function store(StoreUserRequest $request)
@@ -43,28 +46,39 @@ class UserController extends Controller
 
     public function show(Request $request) 
     {
-        $user = $request->user();
-        // Check if profile_photo is a Google URL and proxy it if needed
-        if ($user->profile_photo && filter_var($user->profile_photo, FILTER_VALIDATE_URL) && strpos($user->profile_photo, 'google') !== false) {
+        $user = $request->user()->fresh();
+        Log::info('User from token:', ['user' => $user]);
+
+        // Proxy Google profile photo to local storage if needed
+        if (
+            $user->profile_photo &&
+            filter_var($user->profile_photo, FILTER_VALIDATE_URL) &&
+            strpos($user->profile_photo, 'google') !== false
+        ) {
             $localPath = $this->proxyGoogleProfilePhoto($user->profile_photo);
             if ($localPath) {
-                $user->profile_photo = $localPath; // Update with local path
+                $user->profile_photo = $localPath;
             }
         }
-        return new UserResource($user);
+
+        Log::info('Final profile photo path:', ['photo' => $user->profile_photo]);
+
+        return response()->json([
+            'data' => new UserResource($user),
+        ]);
     }
 
     public function update(UpdateUserRequest $request, $user_id) 
     {
         $user = User::where('user_id', $user_id)->firstOrFail();
         $validatedData = $request->validated();
-        
+
         if (isset($validatedData['password'])) {
             $validatedData['password'] = bcrypt($validatedData['password']);
         }
-        
+
         $user->update($validatedData);
-        
+
         return response()->json([
             'message' => 'User updated successfully.',
             'user' => new UserResource($user),
@@ -74,17 +88,17 @@ class UserController extends Controller
     public function destroy(DestroyUserRequest $request, $user_id)
     {
         $user = User::where('user_id', $user_id)->firstOrFail();
-        
+
         if ($user->user_id === auth()->user()->user_id) {
             return response()->json(['message' => 'Cannot delete self'], 422);
         }
-        
+
         if ($user->events()->exists() || $user->judge()->exists()) {
             return response()->json(['message' => 'User has associated events or judge profile'], 422);
         }
-        
+
         $user->delete();
-        
+
         return response()->json(['message' => 'User deleted successfully.'], 204);
     }
 
@@ -95,16 +109,14 @@ class UserController extends Controller
         $data = $request->validate([
             'first_name' => 'sometimes|string',
             'last_name' => 'sometimes|string',
-            'profile_photo' => 'nullable|image|max:2048', // max 2MB
+            'profile_photo' => 'nullable|image|max:2048',
         ]);
 
         if ($request->hasFile('profile_photo')) {
-            $filename = time().'_'.$request->profile_photo->getClientOriginalName();
-            $request->profile_photo->move(public_path('uploads/profile_photos'), $filename);
-            $data['profile_photo'] = 'uploads/profile_photos/' . $filename;
+            $data['profile_photo'] = $request->file('profile_photo')->store('profile_photos', 'public');
         }
 
-        $user = User::find($user->user_id); // Get the actual model instance
+        $user = User::find($user->user_id); // Refresh instance
         $user->update($data);
 
         return response()->json([
@@ -157,17 +169,24 @@ class UserController extends Controller
     protected function proxyGoogleProfilePhoto($googleUrl)
     {
         try {
-            $filename = 'google_' . time() . '.jpg';
-            $localPath = 'uploads/profile_photos/' . $filename;
+            $hash = md5($googleUrl);
+            $filename = "uploads/profile_photos/{$hash}.jpg";
+            $storagePath = public_path($filename);
 
-            // Download and save the image
-            $imageContent = file_get_contents($googleUrl);
-            if ($imageContent === false) {
-                return null; // Failed to fetch
+            if (!file_exists($storagePath)) {
+                if (!file_exists(dirname($storagePath))) {
+                    mkdir(dirname($storagePath), 0755, true);
+                }
+
+                $imageContent = file_get_contents($googleUrl);
+                if ($imageContent === false) {
+                    return null;
+                }
+
+                file_put_contents($storagePath, $imageContent);
             }
 
-            file_put_contents(public_path($localPath), $imageContent);
-            return $localPath;
+            return $filename;
         } catch (\Exception $e) {
             Log::error('Failed to proxy Google profile photo: ' . $e->getMessage());
             return null;

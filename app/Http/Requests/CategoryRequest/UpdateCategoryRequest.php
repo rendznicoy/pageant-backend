@@ -16,6 +16,17 @@ class UpdateCategoryRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation()
+    {
+        $this->merge([
+            'category_weight' => (int) $this->category_weight,
+            'max_score' => (int) $this->max_score,
+            'category_id' => (int) $this->category_id,
+            'event_id' => (int) $this->event_id,
+            'stage_id' => (int) $this->stage_id,
+        ]);
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -26,10 +37,10 @@ class UpdateCategoryRequest extends FormRequest
         return [
             'category_id' => 'required|exists:categories,category_id',
             'event_id' => 'required|exists:events,event_id',
-            'stage_id' => 'sometimes|exists:stages,stage_id',
-            'category_name' => 'sometimes|string|max:50',
-            'category_weight' => 'sometimes|integer|min:0|max:100',
-            'max_score' => 'sometimes|integer|min:1|max:10',
+            'stage_id' => 'required|exists:stages,stage_id',
+            'category_name' => 'required|string|max:255',
+            'category_weight' => 'required|integer|min:0|max:100',
+            'max_score' => 'required|integer|min:1|max:100',
         ];
     }
 

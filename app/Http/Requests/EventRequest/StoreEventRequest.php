@@ -21,16 +21,28 @@ class StoreEventRequest extends FormRequest
         return $isAuthorized;
     }
 
+    protected function prepareForValidation()
+    {
+        if ($this->has('statisticians') && is_string($this->statisticians)) {
+            $decoded = json_decode($this->statisticians, true);
+            $this->merge(['statisticians' => $decoded]);
+        }
+    }
+
     public function rules(): array
     {
         return [
             'event_name' => 'required|string|max:255',
-            'event_code' => 'required|string|max:255|unique:events,event_code',
-            'venue' => 'nullable|string|max:255',
+            'venue' => 'required|string|max:255',
             'start_date' => 'required|date_format:Y-m-d H:i:s',
             'end_date' => 'required|date_format:Y-m-d H:i:s|after_or_equal:start_date',
             'description' => 'nullable|string',
             'cover_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
+            'division' => 'required|in:standard,male-only,female-only',
+            'statisticians' => 'required|array|min:1',
+            'statisticians.*.id' => 'nullable|integer',
+            'statisticians.*.name' => 'required|string',
+            'created_by' => 'required|exists:users,user_id',
         ];
     }
 
