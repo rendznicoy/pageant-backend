@@ -26,9 +26,9 @@ class StoreCategoryRequest extends FormRequest
         return [
             'event_id' => 'required|exists:events,event_id',
             'stage_id' => 'required|exists:stages,stage_id',
-            'category_name' => 'required|string|max:50',
+            'category_name' => 'required|string|max:255',
             'category_weight' => 'required|integer|min:0|max:100',
-            'max_score' => 'required|integer|min:1|max:10',
+            'max_score' => 'required|integer|min:1|max:100',
         ];
     }
 

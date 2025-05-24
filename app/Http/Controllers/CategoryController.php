@@ -53,17 +53,26 @@ class CategoryController extends Controller
 
     public function update(UpdateCategoryRequest $request)
     {
-        $validated = $request->validated();
-        $category = Category::where('category_id', $validated['category_id'])
-            ->where('event_id', $validated['event_id'])
-            ->firstOrFail();
+        Log::debug('Raw Request', $request->all());
+        
+        try {
+            $validated = $request->validated();
+            Log::debug('Validated', $validated);
 
-        $category->update($validated);
+            $category = Category::where('category_id', $validated['category_id'])
+                ->where('event_id', $validated['event_id'])
+                ->firstOrFail();
 
-        return response()->json([
-            'message' => 'Category updated successfully.',
-            'category' => new CategoryResource($category),
-        ]);
+            $category->update($validated);
+
+            return response()->json([
+                'message' => 'Category updated successfully.',
+                'category' => new CategoryResource($category),
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('Validation Error', ['errors' => $e->errors()]);
+            return response()->json(['message' => 'Validation failed.', 'errors' => $e->errors()], 422);
+        }
     }
 
     public function destroy(DestroyCategoryRequest $request)

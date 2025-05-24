@@ -108,6 +108,8 @@ Route::prefix('v1')->group(function () {
                     Route::get('show', [ScoreController::class, 'show']);
                     Route::patch('edit/{judge_id}/{candidate_id}/{category_id}', [ScoreController::class, 'update']);
                     Route::delete('delete', [ScoreController::class, 'destroy']);
+                    Route::get('export', [ScoreController::class, 'export']);
+                    Route::get('final-results', [ScoreController::class, 'finalResults']);
                 });
 
                 Route::get('report', [PdfReportController::class, 'download']);

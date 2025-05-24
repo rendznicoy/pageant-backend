@@ -16,6 +16,8 @@ use App\Events\ScoreConfirmed;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ScoreController extends Controller
 {
@@ -192,7 +194,6 @@ class ScoreController extends Controller
             'event_id' => 'required|exists:events,event_id',
             'category_id' => 'required|exists:categories,category_id',
             'candidate_id' => 'required|exists:candidates,candidate_id',
-            'score' => 'required|integer|min:0|max:100', // Changed min:1|max:10 to min:0|max:100
             'comments' => 'nullable|string',
         ]);
 
@@ -218,9 +219,11 @@ class ScoreController extends Controller
         }
 
         $category = Category::findOrFail($request->category_id);
-        if ($category->status !== 'active') {
-            Log::warning("Category not active", ['category_id' => $request->category_id]);
-            return response()->json(['message' => 'Category is not active'], 403);
+        
+        if ($request->score < 0 || $request->score > $category->max_score) {
+            return response()->json([
+                'message' => "Score must be between 0 and {$category->max_score} for this category."
+            ], 422);
         }
 
         if ($category->current_candidate_id !== (int) $request->candidate_id) {
@@ -297,7 +300,6 @@ class ScoreController extends Controller
             'event_id' => 'required|exists:events,event_id',
             'category_id' => 'required|exists:categories,category_id',
             'candidate_id' => 'required|exists:candidates,candidate_id',
-            'score' => 'required|integer|min:0|max:100', // Changed min:1 to min:0|max:100
             'comments' => 'nullable|string',
             'confirm' => 'required|boolean',
         ]);
@@ -372,5 +374,116 @@ class ScoreController extends Controller
             ]);
             return response()->json(['message' => 'Failed to confirm score'], 500);
         }
+    }
+
+    public function export($event_id)
+    {
+        $scores = Score::with(['candidate', 'judge', 'category'])
+            ->where('event_id', $event_id)
+            ->get();
+
+        $headers = [
+            "Content-type" => "text/csv",
+            "Content-Disposition" => "attachment; filename=event_{$event_id}_scores.csv",
+            "Pragma" => "no-cache",
+            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
+            "Expires" => "0"
+        ];
+
+        $callback = function () use ($scores) {
+            $file = fopen('php://output', 'w');
+            // CSV Header
+            fputcsv($file, ['Candidate', 'Judge', 'Category', 'Score', 'Comments']);
+
+            foreach ($scores as $score) {
+                Log::debug("Export row", [
+                    'candidate' => $score->candidate?->first_name,
+                    'judge' => $score->judge?->user?->first_name,
+                    'category' => $score->category?->category_name
+                ]);
+                
+                fputcsv($file, [
+                    $score->candidate?->first_name . ' ' . $score->candidate?->last_name,
+                    $score->judge?->user?->first_name . ' ' . $score->judge?->user?->last_name,
+                    $score->category?->category_name, // not ->name
+                    $score->score,
+                    $score->comments ?? 'No comment'
+                ]);
+            }                                  
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    public function finalResults($event_id)
+    {
+        Log::info("Fetching final results (latest stage only) for event", ['event_id' => $event_id]);
+
+        // Find latest stage_id
+        $latestStageId = DB::table('stages')
+            ->where('event_id', $event_id)
+            ->orderByDesc('created_at')
+            ->value('stage_id');
+
+        if (!$latestStageId) {
+            return response()->json(['message' => 'No stages found for this event.'], 404);
+        }
+
+        // Get confirmed scores only from latest stage
+        $scores = Score::where('scores.event_id', $event_id)
+            ->where('scores.status', 'confirmed')
+            ->where('scores.stage_id', $latestStageId)
+            ->whereNotNull('scores.score')
+            ->join('candidates', 'scores.candidate_id', '=', 'candidates.candidate_id')
+            ->select(
+                'scores.candidate_id',
+                'candidates.sex',
+                'candidates.first_name',
+                'candidates.last_name',
+                'candidates.candidate_number',
+                DB::raw('AVG(scores.score) as raw_average')
+            )
+            ->groupBy(
+                'scores.candidate_id',
+                'candidates.sex',
+                'candidates.first_name',
+                'candidates.last_name',
+                'candidates.candidate_number'
+            )
+            ->orderByDesc('raw_average')
+            ->get();
+
+        // Assign rank
+        $rank = 1;
+        $prevScore = null;
+        foreach ($scores as $i => $res) {
+            if ($prevScore !== $res->raw_average) {
+                $rank = $i + 1;
+            }
+            $res->rank = $rank;
+            $prevScore = $res->raw_average;
+        }
+
+        Log::info("Final results (latest stage) computed", [
+            'result_count' => count($scores),
+        ]);
+
+        $results = $scores->map(function ($s) {
+            return [
+                'candidate_id' => $s->candidate_id,
+                'candidate' => [
+                    'first_name' => $s->first_name,
+                    'last_name' => $s->last_name,
+                    'candidate_number' => $s->candidate_number,
+                ],
+                'sex' => $s->sex,
+                'raw_average' => round($s->raw_average, 2),
+                'rank' => $s->rank,
+            ];
+        });
+
+        return response()->json(['candidates' => $results]);
     }
 }

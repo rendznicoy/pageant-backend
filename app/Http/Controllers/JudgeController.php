@@ -16,6 +16,7 @@ use App\Models\Candidate;
 use App\Models\Score;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class JudgeController extends Controller
 {
@@ -30,7 +31,6 @@ class JudgeController extends Controller
         $data = $request->validated();
 
         $event = Event::find($data['event_id']);
-
         if (!$event) {
             return response()->json(['message' => 'Event not found.'], 404);
         }
@@ -42,6 +42,11 @@ class JudgeController extends Controller
             $username = $originalUsername . $counter++;
         }
 
+        $photoPath = null;
+        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
+            $photoPath = $request->file('photo')->store('uploads/profile_photos', 'public');
+        }
+
         $user = User::create([
             'username' => $username,
             'email' => $request->email,
@@ -49,6 +54,7 @@ class JudgeController extends Controller
             'last_name' => $request->last_name,
             'role' => 'judge',
             'password' => null,
+            'profile_photo' => $photoPath, // save path to DB
         ]);
 
         do {
@@ -81,17 +87,54 @@ class JudgeController extends Controller
 
     public function update(UpdateJudgeRequest $request)
     {
+        Log::info('Judge update full request', $request->all());
+
         $validated = $request->validated();
+
+        Log::info('Judge update validated', $validated);
 
         $judge = Judge::where('judge_id', $validated['judge_id'])
             ->where('event_id', $validated['event_id'])
             ->firstOrFail();
 
-        $judge->update($validated);
+        // Update related user
+        $user = $judge->user;
+
+        $updated = false;
+
+        if ($user->first_name !== $validated['first_name']) {
+            $user->first_name = $validated['first_name'];
+            $updated = true;
+        }
+
+        if ($user->last_name !== $validated['last_name']) {
+            $user->last_name = $validated['last_name'];
+            $updated = true;
+        }
+
+        if ($user->email !== $validated['email']) {
+            $user->email = $validated['email'];
+            $updated = true;
+        }
+
+        // Handle new profile photo
+        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
+            // Delete old if exists
+            if ($user->profile_photo && Storage::disk('public')->exists($user->profile_photo)) {
+                Storage::disk('public')->delete($user->profile_photo);
+            }
+
+            $user->profile_photo = $request->file('photo')->store('uploads/profile_photos', 'public');
+            $updated = true;
+        }
+
+        if ($updated) {
+            $user->save();
+        }
 
         return response()->json([
             'message' => 'Judge updated successfully.',
-            'judge' => new JudgeResource($judge),
+            'judge' => new JudgeResource($judge->fresh()),
         ]);
     }
 
@@ -103,9 +146,17 @@ class JudgeController extends Controller
             ->where('event_id', $validated['event_id'])
             ->firstOrFail();
 
+        $user = $judge->user; // Fetch related user
+
+        // Delete the judge first
         $judge->delete();
 
-        return response()->json(['message' => 'Judge deleted successfully.'], 204);
+        // Then delete the user (if you really want full cleanup)
+        if ($user) {
+            $user->delete();
+        }
+
+        return response()->json(['message' => 'Judge and associated user deleted successfully.'], 204);
     }
 
     public function currentSession(Request $request)

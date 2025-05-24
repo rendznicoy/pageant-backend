@@ -21,8 +21,12 @@ class StageController extends Controller
 {
     public function index(Request $request, $event_id)
     {
+        Log::info('StageController@index called', ['event_id' => $event_id]);
         $stages = Stage::where('event_id', $event_id)->with('categories')->get();
-        return response()->json(StageResource::collection($stages));
+        Log::info('Returning stages:', ['count' => $stages->count()]);
+        return response()->json([
+            'data' => StageResource::collection($stages)
+        ]);
     }
 
     public function store(StoreStageRequest $request)
