@@ -1,5 +1,3 @@
-    <!-- Live as if you were to die tomorrow. Learn as if you were to live forever. - Mahatma Gandhi -->
-</div>
 <!DOCTYPE html>
 <html>
 <head>
@@ -29,12 +27,6 @@
         .header p {
             margin: 5px 0;
             font-size: 12px;
-        }
-        .statisticians {
-            margin-bottom: 15px;
-            padding: 5px;
-            background-color: #f5f5f5;
-            border: 1px solid #ddd;
         }
         .results-table {
             width: 100%;
@@ -75,14 +67,6 @@
             font-weight: bold;
             font-size: 12px;
         }
-        .scoring-explanation {
-            margin-top: 20px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            background-color: #f9f9f9;
-            font-size: 9px;
-            line-height: 1.4;
-        }
         .sex-section {
             margin-bottom: 30px;
         }
@@ -94,21 +78,83 @@
             font-size: 14px;
             font-weight: bold;
         }
+        .scoring-explanation {
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        
+        /* Signature Section Styles */
+        .signature-section {
+            margin-top: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+        }
+        
+        .signature-section, .statisticians {
+            text-align: center;
+        }
+        .signature-container {
+            display: inline-flex !important;
+            flex-direction: row !important;
+            gap: 20px !important;
+            justify-content: flex-start !important; /* default, since parent is centered */
+            align-items: flex-end !important;
+            margin: 0 auto 20px auto !important;
+            width: auto !important;
+        }
+        .signature-box {
+            text-align: center;
+            min-width: 100px !important;
+            max-width: 200px !important;
+            display:inline-block !important;
+            margin: 40px 40px 0 0 !important;
+        }
+
+        
+        .signature-line {
+            height: 40px;
+            border-bottom: 1px solid #333;
+            margin-bottom: 8px;
+            width: 100%;
+        }
+        
+        .signature-name {
+            font-weight: bold;
+            font-size: 11px;
+            margin-bottom: 2px;
+        }
+        
+        .signature-label {
+            font-size: 9px;
+            color: #666;
+        }
+        
+        /* Statisticians Section */
+        .statisticians {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background-color: #f5f5f5;
+        }
+        
+        .statisticians-title {
+            font-weight: bold;
+            font-size: 12px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>{{ $event->event_name }} - Final Results</h1>
         <p>Date: {{ \Carbon\Carbon::parse($event->start_date)->format('F j, Y') }}</p>
-    </div>
-
-    <div class="statisticians">
-        <strong>Statistician/s:</strong> 
-        @if($event->statisticians && is_array($event->statisticians))
-            {{ collect($event->statisticians)->pluck('name')->implode(', ') }}
-        @else
-            Not specified
-        @endif
+        <p>Venue: {{ $event->venue ?? 'Not specified' }}</p>
     </div>
 
     @php
@@ -129,7 +175,7 @@
                             <th rowspan="3" style="width: 15%;">Candidate Name<br>(First, Last)</th>
                             <th rowspan="3" style="width: 12%;">Team Name</th>
                             <th colspan="{{ count($judges) * 2 }}" class="judge-header">Individual Judge Scores and Ranks</th>
-                            <th rowspan="3" style="width: 8%;" class="mean-scores">Mean Scores<br>and Ranks</th>
+                            <th colspan="2" style="width: 12%;" class="mean-scores">Mean Scores<br>and Ranks</th>
                             <th rowspan="3" style="width: 6%;" class="overall-rank">Overall<br>Rank</th>
                         </tr>
                         <tr>
@@ -162,7 +208,7 @@
                                 @endforeach
                                 
                                 <td class="mean-scores">{{ number_format($result['mean_rating'], 2) }}</td>
-                                <td class="mean-scores">{{ number_format($result['mean_rank'], 2) }}</td>
+                                <td class="mean-scores">{{ number_format($result['mean_rank'] ?? $result['overall_rank'], 2) }}</td>
                                 <td class="overall-rank">{{ $result['overall_rank'] }}</td>
                             </tr>
                         @endforeach
@@ -176,9 +222,55 @@
         <strong>Scoring Process Explanation:</strong><br/>
         • <strong>Mean Rating</strong> = (Sum of Judges' Scores) ÷ (Number of Judges)<br/>
         • <strong>Mean Rank</strong> = (Sum of Judges' Assigned Ranks) ÷ (Number of Judges)<br/>
-        • <strong>Overall Rank</strong> determined primarily by Mean Rating; Mean Rank used as tiebreaker<br/>
+        • <strong>Overall Rank</strong> determined primarily by Mean Rank; Mean Rating used as tiebreaker<br/>
         <br/>
         <strong>Judges:</strong> {{ collect($judges)->pluck('name')->implode(', ') }}
+        <br/>
+        <strong>Statistician(s):</strong> {{ collect($event->statisticians)->map(fn($s) => is_array($s) ? $s['name'] : $s)->implode(', ') }}
     </div>
+
+    <!-- Judge Signatures Section -->
+    @php 
+        $judgeCount = count($judges);
+        $judgeCountClass = $judgeCount <= 6 ? "count-{$judgeCount}" : "count-many";
+    @endphp
+    @if($judgeCount > 0)
+        <div class="signature-section">
+            <div class="statisticians-title">Judge Signatures</div>
+            <div class="signature-container {{ $judgeCountClass }}">
+                @foreach($judges as $judge)
+                    <div class="signature-box">
+                        <div class="signature-line"></div>
+                        <div class="signature-name">{{ $judge['name'] ?? 'Judge' }}</div>
+                        <div class="signature-label">Signature</div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+   
+    <!-- Statisticians Section -->
+    @if($event->statisticians && is_array($event->statisticians) && count($event->statisticians) > 0)
+        @php 
+            $statCount = count($event->statisticians);
+            $statCountClass = $statCount <= 6 ? "count-{$statCount}" : "count-many";
+        @endphp
+        <div class="statisticians">
+            <div class="statisticians-title">Statistician Signatures</div>
+            <div class="signature-container {{ $statCountClass }}">
+                @foreach($event->statisticians as $statistician)
+                    <div class="signature-box">
+                        <div class="signature-line"></div>
+                        <div class="signature-name">{{ is_array($statistician) ? ($statistician['name'] ?? 'Statistician') : $statistician }}</div>
+                        <div class="signature-label">Signature</div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @else
+        <div class="statisticians">
+            <div class="statisticians-title">Statistician/s: Not specified</div>
+        </div>
+    @endif    
 </body>
 </html>

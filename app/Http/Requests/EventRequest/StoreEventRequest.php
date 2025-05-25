@@ -39,6 +39,7 @@ class StoreEventRequest extends FormRequest
             'description' => 'nullable|string',
             'cover_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
             'division' => 'required|in:standard,male-only,female-only',
+            'global_max_score' => 'sometimes|integer|min:1|max:100',
             'statisticians' => 'required|array|min:1',
             'statisticians.*.id' => 'nullable|integer',
             'statisticians.*.name' => 'required|string',

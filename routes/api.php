@@ -70,6 +70,7 @@ Route::prefix('v1')->group(function () {
                     Route::post('/{stage_id}/select-top-candidates', [StageController::class, 'selectTopCandidates']);
                     Route::post('/{stage_id}/reset-top-candidates', [StageController::class, 'resetTopCandidates']);
                     Route::get('/{stage_id}/partial-results', [StageController::class, 'partialResults']);
+                    Route::get('/{stage_id}/category-results', [StageController::class, 'categoryResults']);
                 });
 
                 Route::prefix('categories')->group(function () {
@@ -84,6 +85,7 @@ Route::prefix('v1')->group(function () {
                     Route::post('{category_id}/reset', [CategoryController::class, 'reset']);
                     Route::post('{category_id}/set-candidate', [CategoryController::class, 'setCandidate']);
                     Route::get('{category_id}/pending-scores', [CategoryController::class, 'hasPendingScores']);
+                    Route::get('/{stage_id}/categories', [CategoryController::class, 'getCategoriesByStage']);
                 });
 
                 Route::prefix('candidates')->group(function () {

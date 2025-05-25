@@ -30,7 +30,6 @@ class Event extends Model
 
     protected $attributes = [
         'status' => 'inactive',
-        'division' => 'standard',
         'global_max_score' => 100,
     ];
 
@@ -41,6 +40,7 @@ class Event extends Model
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
         'statisticians' => 'array',
+        'global_max_score' => 'integer', 
     ];
 
     public function getStartDateAttribute($value)
