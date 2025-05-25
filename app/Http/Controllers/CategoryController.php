@@ -17,6 +17,7 @@ use App\Events\CandidateSet;
 use App\Models\Stage;
 use Illuminate\Support\Facades\Log;
 use App\Models\Judge;
+use App\Models\Event;
 
 class CategoryController extends Controller
 {
@@ -29,9 +30,15 @@ class CategoryController extends Controller
     public function store(StoreCategoryRequest $request)
     {
         $validated = $request->validated();
+        
+        // Get the event's global max score
+        $event = Event::findOrFail($validated['event_id']);
+        $globalMaxScore = $event->global_max_score ?? 100;
+        
         $category = Category::create(array_merge($validated, [
             'status' => 'pending',
             'current_candidate_id' => null,
+            'max_score' => $globalMaxScore, // Use global max score
         ]));
 
         return response()->json([
@@ -63,49 +70,20 @@ class CategoryController extends Controller
                 ->where('event_id', $validated['event_id'])
                 ->firstOrFail();
 
-            // Store old values for comparison
-            $oldMaxScore = $category->max_score;
-            
-            // Update the category
+            // Get the event's global max score and ensure category uses it
+            $event = Event::findOrFail($validated['event_id']);
+            $globalMaxScore = $event->global_max_score ?? 100;
+            $validated['max_score'] = $globalMaxScore;
+
             $category->update($validated);
-            
-            // Log the update for debugging
-            Log::info('Category updated successfully', [
-                'category_id' => $category->category_id,
-                'old_max_score' => $oldMaxScore,
-                'new_max_score' => $category->max_score,
-                'updated_fields' => $validated
-            ]);
 
-            // If max_score was updated, we might need to update related scores
-            if (isset($validated['max_score']) && $oldMaxScore != $validated['max_score']) {
-                Log::info('Max score changed, updating related data', [
-                    'category_id' => $category->category_id,
-                    'old_max' => $oldMaxScore,
-                    'new_max' => $validated['max_score']
-                ]);
-                
-                // Optionally scale existing scores if needed
-                // $this->scaleExistingScores($category, $oldMaxScore, $validated['max_score']);
-            }
-
-            // Return fresh data to ensure UI gets updated values
-            $freshCategory = $category->fresh();
-            
             return response()->json([
                 'message' => 'Category updated successfully.',
-                'category' => new CategoryResource($freshCategory),
+                'category' => new CategoryResource($category),
             ]);
-            
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error('Validation Error', ['errors' => $e->errors()]);
             return response()->json(['message' => 'Validation failed.', 'errors' => $e->errors()], 422);
-        } catch (\Exception $e) {
-            Log::error('Category update error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return response()->json(['message' => 'Failed to update category.'], 500);
         }
     }
 
@@ -462,6 +440,25 @@ class CategoryController extends Controller
         ]);
 
         return response()->json(['pending_scores' => $results]);
+    }
+
+    public function getCategoriesByStage(Request $request, $event_id, $stage_id)
+    {
+        try {
+            $categories = Category::where('event_id', $event_id)
+                ->where('stage_id', $stage_id)
+                ->with('stage')
+                ->get();
+            
+            return response()->json(CategoryResource::collection($categories));
+        } catch (\Exception $e) {
+            Log::error('Error fetching categories by stage:', [
+                'event_id' => $event_id,
+                'stage_id' => $stage_id,
+                'error' => $e->getMessage()
+            ]);
+            return response()->json(['message' => 'Failed to fetch categories'], 500);
+        }
     }
 
     private function scaleExistingScores($category, $oldMaxScore, $newMaxScore)

@@ -497,4 +497,80 @@ class StageController extends Controller
             ])
         ]);
     }
+
+    public function categoryResults($event_id, $stage_id)
+    {
+        try {
+            $stage = Stage::where('event_id', $event_id)->findOrFail($stage_id);
+            
+            // Get categories for this stage
+            $categories = Category::where('stage_id', $stage_id)->get();
+            
+            $categoryResults = [];
+            
+            foreach ($categories as $category) {
+                // Get average scores per candidate for this category
+                $scores = Score::where('scores.category_id', $category->category_id)
+                    ->where('scores.status', 'confirmed')
+                    ->join('candidates', 'scores.candidate_id', '=', 'candidates.candidate_id')
+                    ->where('candidates.is_active', true)
+                    ->select(
+                        'scores.candidate_id',
+                        'candidates.first_name',
+                        'candidates.last_name',
+                        'candidates.candidate_number',
+                        'candidates.sex',
+                        DB::raw('AVG(scores.score) as category_average')
+                    )
+                    ->groupBy(
+                        'scores.candidate_id',
+                        'candidates.first_name',
+                        'candidates.last_name',
+                        'candidates.candidate_number',
+                        'candidates.sex'
+                    )
+                    ->orderBy('category_average', 'desc')
+                    ->get();
+
+                // Separate by gender and add ranks
+                $males = $scores->where('sex', 'M')->values();
+                $females = $scores->where('sex', 'F')->values();
+                
+                // Add ranks
+                $males = $males->map(function ($item, $index) {
+                    $item->rank = $index + 1;
+                    return $item;
+                });
+                
+                $females = $females->map(function ($item, $index) {
+                    $item->rank = $index + 1;
+                    return $item;
+                });
+
+                $categoryResults[] = [
+                    'category_id' => $category->category_id,
+                    'category_name' => $category->category_name,
+                    'max_score' => $category->max_score,
+                    'weight' => $category->category_weight,
+                    'males' => $males,
+                    'females' => $females
+                ];
+            }
+
+            return response()->json([
+                'stage' => [
+                    'stage_id' => $stage->stage_id,
+                    'stage_name' => $stage->stage_name
+                ],
+                'categories' => $categoryResults
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching category results', [
+                'event_id' => $event_id,
+                'stage_id' => $stage_id,
+                'error' => $e->getMessage()
+            ]);
+            return response()->json(['message' => 'Failed to fetch category results'], 500);
+        }
+    }
 }
