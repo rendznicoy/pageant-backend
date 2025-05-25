@@ -55,6 +55,7 @@ Route::prefix('v1')->group(function () {
             Route::post('{event_id}/finalize', [EventController::class, 'finalize']);
             Route::post('{event_id}/reset', [EventController::class, 'reset']);
             Route::patch('{event_id}/division', [EventController::class, 'changeDivision']);
+            Route::patch('{event_id}/global-max-score', [EventController::class, 'updateGlobalMaxScore']);
 
             Route::prefix('{event_id}')->group(function () {
                 Route::prefix('stages')->group(function () {
