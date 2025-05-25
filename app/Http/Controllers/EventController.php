@@ -383,4 +383,23 @@ class EventController extends Controller
             'event' => new EventResource($event),
         ], 200);
     }
+
+    public function updateGlobalMaxScore(Request $request, $event_id)
+    {
+        $request->validate([
+            'global_max_score' => 'required|integer|min:1|max:100',
+        ]);
+
+        $event = Event::findOrFail($event_id);
+        $event->update(['global_max_score' => $request->global_max_score]);
+
+        // Update all existing categories with the new max score
+        Category::where('event_id', $event_id)
+            ->update(['max_score' => $request->global_max_score]);
+
+        return response()->json([
+            'message' => 'Global max score updated successfully.',
+            'global_max_score' => $request->global_max_score
+        ]);
+    }
 }
