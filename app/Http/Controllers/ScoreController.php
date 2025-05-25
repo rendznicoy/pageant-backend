@@ -26,7 +26,7 @@ class ScoreController extends Controller
 {
     public function index(Request $request, $event_id)
     {
-        $query = Score::with(['event', 'judge.user', 'candidate', 'category'])
+        $query = Score::with(['event', 'judge.user', 'candidate', 'category.stage', 'category'])
             ->where('event_id', $event_id);
 
         if ($request->has('judge_id')) {
