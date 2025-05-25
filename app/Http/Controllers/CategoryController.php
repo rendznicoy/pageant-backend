@@ -63,15 +63,49 @@ class CategoryController extends Controller
                 ->where('event_id', $validated['event_id'])
                 ->firstOrFail();
 
+            // Store old values for comparison
+            $oldMaxScore = $category->max_score;
+            
+            // Update the category
             $category->update($validated);
+            
+            // Log the update for debugging
+            Log::info('Category updated successfully', [
+                'category_id' => $category->category_id,
+                'old_max_score' => $oldMaxScore,
+                'new_max_score' => $category->max_score,
+                'updated_fields' => $validated
+            ]);
 
+            // If max_score was updated, we might need to update related scores
+            if (isset($validated['max_score']) && $oldMaxScore != $validated['max_score']) {
+                Log::info('Max score changed, updating related data', [
+                    'category_id' => $category->category_id,
+                    'old_max' => $oldMaxScore,
+                    'new_max' => $validated['max_score']
+                ]);
+                
+                // Optionally scale existing scores if needed
+                // $this->scaleExistingScores($category, $oldMaxScore, $validated['max_score']);
+            }
+
+            // Return fresh data to ensure UI gets updated values
+            $freshCategory = $category->fresh();
+            
             return response()->json([
                 'message' => 'Category updated successfully.',
-                'category' => new CategoryResource($category),
+                'category' => new CategoryResource($freshCategory),
             ]);
+            
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error('Validation Error', ['errors' => $e->errors()]);
             return response()->json(['message' => 'Validation failed.', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            Log::error('Category update error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json(['message' => 'Failed to update category.'], 500);
         }
     }
 
@@ -428,5 +462,33 @@ class CategoryController extends Controller
         ]);
 
         return response()->json(['pending_scores' => $results]);
+    }
+
+    private function scaleExistingScores($category, $oldMaxScore, $newMaxScore)
+    {
+        if ($oldMaxScore <= 0 || $newMaxScore <= 0) {
+            return; // Avoid division by zero
+        }
+        
+        $scaleFactor = $newMaxScore / $oldMaxScore;
+        
+        // Update existing scores for this category
+        $scores = Score::where('category_id', $category->category_id)->get();
+        
+        foreach ($scores as $score) {
+            $newScore = round($score->score * $scaleFactor, 2);
+            
+            // Ensure the new score doesn't exceed the new max
+            $newScore = min($newScore, $newMaxScore);
+            
+            $score->update(['score' => $newScore]);
+            
+            Log::info('Score scaled', [
+                'score_id' => $score->id,
+                'old_score' => $score->score,
+                'new_score' => $newScore,
+                'scale_factor' => $scaleFactor
+            ]);
+        }
     }
 }

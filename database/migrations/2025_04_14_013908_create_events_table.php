@@ -21,6 +21,7 @@ return new class extends Migration
             $table->string('cover_photo')->nullable();
             $table->text('description')->nullable();
             $table->enum('division', ['standard', 'male-only', 'female-only'])->default('standard');
+            $table->integer('global_max_score')->default(100);
             $table->json('statisticians')->nullable();
             $table->foreignId('created_by')->constrained('users', 'user_id')->onDelete('cascade');
             $table->timestamps();
