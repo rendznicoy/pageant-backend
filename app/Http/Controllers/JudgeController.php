@@ -225,6 +225,7 @@ class JudgeController extends Controller
                 'event_name' => $event->event_name,
                 'venue' => $event->venue,
                 'status' => $event->status,
+                'max_score' => $currentCategory ? $currentCategory->max_score : 100, // Add this
             ],
             'judge_name' => $user->first_name . ' ' . $user->last_name,
             'judge' => [

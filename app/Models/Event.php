@@ -25,6 +25,13 @@ class Event extends Model
         'description',
         'division',
         'statisticians',
+        'global_max_score',
+    ];
+
+    protected $attributes = [
+        'status' => 'inactive',
+        'division' => 'standard',
+        'global_max_score' => 100,
     ];
 
     protected $casts = [
@@ -59,6 +66,11 @@ class Event extends Model
     public function getLastAccessedAttribute($value)
     {
         return $value ? Carbon::parse($value)->toISOString() : null;
+    }
+
+    public function getMaxScoreAttribute()
+    {
+        return $this->global_max_score ?? 100;
     }
 
     public function createdBy()
