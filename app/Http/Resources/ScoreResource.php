@@ -28,6 +28,7 @@ class ScoreResource extends JsonResource
             'judge' => new JudgeResource($this->whenLoaded('judge')),
             'candidate' => new CandidateResource($this->whenLoaded('candidate')),
             'category' => new CategoryResource($this->whenLoaded('category')),
+            'stage' => $this->whenLoaded('category.stage'),
         ];
     }
 }
