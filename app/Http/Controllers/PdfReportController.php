@@ -16,7 +16,6 @@ class PdfReportController extends Controller
     {
         $validated = $request->validated();
         $event = Event::where('event_id', $validated['event_id'])->firstOrFail();
-
         // Fetch stages and their results
         $stages = Stage::where('event_id', $event->event_id)
             ->get()
@@ -50,10 +49,11 @@ class PdfReportController extends Controller
                 return $stage;
             });
 
-        $pdf = Pdf::loadView('pdf.event_scores', compact('event', 'stages'));
+            $pdf = Pdf::loadView('pdf.event_scores', compact('event', 'stages'))
+            ->setPaper('a4', 'landscape'); // Add landscape orientation
 
-        $filename = str_replace(' ', '_', strtolower($event->event_name)) . '_scores.pdf';
-        return $pdf->download($filename);
+            $filename = str_replace(' ', '_', strtolower($event->event_name)) . '_scores.pdf';
+            return $pdf->download($filename);
     }
 
     public function preview(DownloadReportRequest $request)
@@ -97,7 +97,8 @@ class PdfReportController extends Controller
                     return $stage;
                 });
 
-            $pdf = Pdf::loadView('pdf.event_scores', compact('event', 'stages'));
+                $pdf = Pdf::loadView('pdf.event_scores', compact('event', 'stages'))
+                ->setPaper('a4', 'landscape');
 
             $pdfContent = $pdf->output();
 
