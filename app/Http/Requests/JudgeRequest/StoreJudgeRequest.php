@@ -26,7 +26,6 @@ class StoreJudgeRequest extends FormRequest
     {
         return [
             'event_id' => 'required|exists:events,event_id',
-            'email' => 'required|email|unique:users,email',
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',

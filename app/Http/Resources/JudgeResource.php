@@ -21,7 +21,6 @@ class JudgeResource extends JsonResource
             'event_id' => $this->event_id,
             'user_id' => $this->user->user_id,
             'pin_code' => $this->pin_code,
-            'email' => $this->user->email,
             'first_name' => $this->user->first_name,
             'last_name' => $this->user->last_name,
             'role' => $this->user->role,

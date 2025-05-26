@@ -35,7 +35,7 @@ class JudgeController extends Controller
             return response()->json(['message' => 'Event not found.'], 404);
         }
 
-        $username = strtolower(explode('@', $request->email)[0]);
+        $username = strtolower(explode('@', $request->first_name)[0]);
         $originalUsername = $username;
         $counter = 1;
         while (User::where('username', $username)->exists()) {
@@ -49,7 +49,6 @@ class JudgeController extends Controller
 
         $user = User::create([
             'username' => $username,
-            'email' => $request->email,
             'first_name' => $request->first_name,
             'last_name' => $request->last_name,
             'role' => 'judge',
@@ -109,11 +108,6 @@ class JudgeController extends Controller
 
         if ($user->last_name !== $validated['last_name']) {
             $user->last_name = $validated['last_name'];
-            $updated = true;
-        }
-
-        if ($user->email !== $validated['email']) {
-            $user->email = $validated['email'];
             $updated = true;
         }
 
