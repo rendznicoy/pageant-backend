@@ -37,7 +37,6 @@ class UpdateJudgeRequest extends FormRequest
             'user_id'    => 'required|exists:users,user_id',
             'first_name' => 'required|string',
             'last_name'  => 'required|string',
-            'email'      => 'required|email',
         ];
     }
 

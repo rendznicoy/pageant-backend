@@ -15,7 +15,7 @@ return new class extends Migration
             $table->bigIncrements('user_id');
 
             $table->string('username')->unique();
-            $table->string('email')->unique();
+            $table->string('email')->unique()->nullable(); // Nullable for Google login
             $table->string('google_id')->nullable();
             $table->string('password')->nullable(); // Nullable for Google login or judges w/ pin_code
 
