@@ -23,24 +23,47 @@ class UpdateEventRequest extends FormRequest
         return $isAuthorized;
     }
 
+    // app/Http/Requests/EventRequest/UpdateEventRequest.php
     protected function prepareForValidation(): void
     {
-        $raw = $this->request; // Access Symfony's underlying input bag
+        $raw = $this->request;
 
         $eventName = $raw->get('event_name');
         $venue = $raw->get('venue');
         $description = $raw->get('description');
         $start = $raw->get('start_date');
         $end = $raw->get('end_date');
+        
+        // Add statisticians parsing logic (same as StoreEventRequest)
+        $statisticians = $raw->get('statisticians');
+        $parsedStatisticians = null;
+        
+        if ($statisticians && is_string($statisticians)) {
+            try {
+                $parsedStatisticians = json_decode($statisticians, true);
+            } catch (\Exception $e) {
+                Log::error('Failed to parse statisticians JSON:', [
+                    'error' => $e->getMessage(),
+                    'statisticians_raw' => $statisticians,
+                ]);
+            }
+        }
 
         try {
-            $this->merge([
+            $mergeData = [
                 'event_name' => $eventName,
                 'venue' => $venue,
                 'description' => $description,
                 'start_date' => $start ? \Carbon\Carbon::parse($start)->format('Y-m-d H:i:s') : null,
                 'end_date' => $end ? \Carbon\Carbon::parse($end)->format('Y-m-d H:i:s') : null,
-            ]);
+            ];
+            
+            // Only merge statisticians if we have parsed data
+            if ($parsedStatisticians !== null) {
+                $mergeData['statisticians'] = $parsedStatisticians;
+            }
+            
+            $this->merge($mergeData);
         } catch (\Exception $e) {
             Log::error('prepareForValidation error:', [
                 'error' => $e->getMessage(),
