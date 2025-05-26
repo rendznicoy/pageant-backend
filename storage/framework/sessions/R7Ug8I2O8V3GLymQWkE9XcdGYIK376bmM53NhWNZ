@@ -1,1 +1,0 @@
-a:5:{s:6:"_token";s:40:"dgNlFz0jwsoTt8BBBdIbWQKphxP256HGrus2mGC7";s:6:"_flash";a:2:{s:3:"old";a:0:{}s:3:"new";a:0:{}}s:17:"password_hash_web";s:60:"$2y$12$x7TxP2wGvPStoHGfJLk/aOJx2mm51ZROrkc/eYz/PhhG8wrXRqis6";s:5:"state";s:40:"6QkOlNd7G2S7ovj0oRo6oQuCcnFqwH3c9YMyHZuW";s:9:"_previous";a:1:{s:3:"url";s:49:"http://localhost:8000/api/v1/auth/google/redirect";}}
