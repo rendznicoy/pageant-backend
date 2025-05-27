@@ -67,6 +67,17 @@ class DatabaseSeeder extends Seeder
                 'scenarios' => ['pending', 'pending', 'pending'],
                 'active_candidates' => 8,
             ],
+            // Add this new event configuration for testing finalization
+            [
+                'name' => 'Ready to Finalize Event 2025',
+                'venue' => 'Test Arena',
+                'status' => 'active',
+                'division' => 'standard',
+                'max_score' => 100,
+                'days_offset' => -1,
+                'scenarios' => ['finalized', 'finalized', 'finalized'], // All stages finalized
+                'active_candidates' => 8,
+            ],
         ];
 
         foreach ($eventConfigs as $index => $config) {
@@ -84,7 +95,6 @@ class DatabaseSeeder extends Seeder
             'description' => 'A prestigious competition showcasing talent, intelligence, and excellence.',
             'status' => $config['status'],
             'division' => $config['division'],
-            'global_max_score' => $config['max_score'],
             'created_by' => $admin->user_id,
             'cover_photo' => null,
             'statisticians' => [['name' => 'Dr. Maria Santos']],
@@ -207,11 +217,43 @@ class DatabaseSeeder extends Seeder
             }
         }
 
+        // Define candidate performance levels for more realistic scoring
+        $candidatePerformanceLevels = [
+            1 => ['base' => 0.92, 'variance' => 0.04], // Excellent performer
+            2 => ['base' => 0.88, 'variance' => 0.05], // Very good
+            3 => ['base' => 0.85, 'variance' => 0.06], // Good
+            4 => ['base' => 0.82, 'variance' => 0.05], // Above average
+            5 => ['base' => 0.78, 'variance' => 0.07], // Average
+            6 => ['base' => 0.75, 'variance' => 0.06], // Below average
+            7 => ['base' => 0.72, 'variance' => 0.08], // Needs improvement
+            8 => ['base' => 0.70, 'variance' => 0.07], // Poor
+            9 => ['base' => 0.68, 'variance' => 0.09], // Very poor
+            10 => ['base' => 0.65, 'variance' => 0.08], // Worst performer
+        ];
+
+        // Judge bias/preferences (some judges are stricter/more generous)
+        $judgeBiases = [];
+        foreach ($judges as $index => $judge) {
+            $judgeBiases[$judge->judge_id] = [
+                'generosity' => 0.97 + ($index * 0.015), // Range from 0.97 to ~1.06
+                'consistency' => 0.02 + ($index * 0.005), // Range from 0.02 to ~0.06
+            ];
+        }
+
+        // Generate scores for finalized stages
         foreach ($judges as $judge) {
             foreach ($candidates as $candidate) {
                 foreach ($stages->where('status', 'finalized') as $stage) {
                     foreach ($categories->where('stage_id', $stage->stage_id) as $category) {
-                        $score = round($config['max_score'] * 0.85, 1);
+                        $score = $this->generateScore(
+                            $candidate->candidate_number,
+                            $judge->judge_id,
+                            $category->category_name,
+                            $config['max_score'],
+                            $candidatePerformanceLevels,
+                            $judgeBiases
+                        );
+
                         Score::create([
                             'event_id' => $event->event_id,
                             'judge_id' => $judge->judge_id,
@@ -220,14 +262,14 @@ class DatabaseSeeder extends Seeder
                             'candidate_id' => $candidate->candidate_id,
                             'score' => $score,
                             'status' => 'confirmed',
-                            'comments' => 'Consistent and well-prepared performance.',
+                            'comments' => $this->generateComment($score, $config['max_score']),
                         ]);
                     }
                 }
             }
         }
 
-        // ➕ Add partial scores only for active events
+        // Add partial scores for active events with varied scoring
         if ($event->status === 'active') {
             $activeStage = $stages->firstWhere('status', 'active');
             if ($activeStage) {
@@ -238,7 +280,17 @@ class DatabaseSeeder extends Seeder
                 foreach ($scoringJudges as $judge) {
                     foreach ($activeCandidates as $candidate) {
                         foreach ($activeCategories as $category) {
-                            $score = round($config['max_score'] * 0.78, 1);
+                            // For active stage, add some improvement/decline from previous performance
+                            $score = $this->generateScore(
+                                $candidate->candidate_number,
+                                $judge->judge_id,
+                                $category->category_name,
+                                $config['max_score'],
+                                $candidatePerformanceLevels,
+                                $judgeBiases,
+                                0.03 // Additional variance for active stage
+                            );
+
                             Score::create([
                                 'event_id' => $event->event_id,
                                 'judge_id' => $judge->judge_id,
@@ -247,12 +299,106 @@ class DatabaseSeeder extends Seeder
                                 'candidate_id' => $candidate->candidate_id,
                                 'score' => $score,
                                 'status' => 'confirmed',
-                                'comments' => 'Partial score under review.',
+                                'comments' => $this->generateComment($score, $config['max_score']),
                             ]);
                         }
                     }
                 }
             }
+        }
+    }
+
+    // In the generateScore method of DatabaseSeeder.php
+    private function generateScore($candidateNumber, $judgeId, $categoryName, $maxScore, $performanceLevels, $judgeBiases, $extraVariance = 0)
+    {
+        // Get candidate's base performance level
+        $performance = $performanceLevels[$candidateNumber] ?? $performanceLevels[5];
+        
+        // Get judge bias
+        $judgeBias = $judgeBiases[$judgeId] ?? ['generosity' => 1.0, 'consistency' => 0.03];
+        
+        // Add judge-specific preferences (some judges prefer certain candidates)
+        $judgePreference = 1.0;
+        $judgeIndex = $judgeId % 5; // Cycle through judge preferences
+        if (($judgeIndex === 0 && in_array($candidateNumber, [1, 3])) ||
+            ($judgeIndex === 1 && in_array($candidateNumber, [2, 4])) ||
+            ($judgeIndex === 2 && in_array($candidateNumber, [1, 5])) ||
+            ($judgeIndex === 3 && in_array($candidateNumber, [3, 6])) ||
+            ($judgeIndex === 4 && in_array($candidateNumber, [2, 6]))) {
+            $judgePreference = 1.1; // 10% bonus for preferred candidates
+        }
+        
+        // Category-specific adjustments
+        $categoryMultiplier = 1.0;
+        switch ($categoryName) {
+            case 'Physical Fitness':
+            case 'Conditioning':
+                if (in_array($candidateNumber, [1, 3, 5])) $categoryMultiplier = 1.08;
+                if (in_array($candidateNumber, [2, 4, 6])) $categoryMultiplier = 0.95;
+                break;
+            case 'Stage Presence':
+            case 'Stage Impact':
+                if (in_array($candidateNumber, [2, 4, 6])) $categoryMultiplier = 1.06;
+                if (in_array($candidateNumber, [1, 3, 5])) $categoryMultiplier = 0.97;
+                break;
+            case 'Communication Skills':
+                if (in_array($candidateNumber, [1, 2, 4])) $categoryMultiplier = 1.05;
+                if (in_array($candidateNumber, [3, 5, 6])) $categoryMultiplier = 0.96;
+                break;
+            case 'Overall Appeal':
+            case 'Confidence':
+                if (in_array($candidateNumber, [1, 2])) $categoryMultiplier = 1.03;
+                if (in_array($candidateNumber, [5, 6])) $categoryMultiplier = 0.98;
+                break;
+        }
+        
+        // Calculate base score with judge preference
+        $baseScore = $performance['base'] * $categoryMultiplier * $judgeBias['generosity'] * $judgePreference * $maxScore;
+        
+        // Add random variance
+        $totalVariance = $performance['variance'] + $judgeBias['consistency'] + $extraVariance;
+        $variance = (rand(-100, 100) / 100) * $totalVariance * $maxScore;
+        
+        $finalScore = $baseScore + $variance;
+        
+        // Ensure score is within bounds
+        $finalScore = max(0, min($maxScore, $finalScore));
+        
+        return round($finalScore, 1);
+    }
+
+    private function generateComment($score, $maxScore)
+    {
+        $percentage = ($score / $maxScore) * 100;
+        
+        if ($percentage >= 90) {
+            return collect([
+                'Outstanding performance with exceptional execution.',
+                'Truly impressive display of skill and confidence.',
+                'Exemplary presentation in all aspects.',
+                'Remarkable performance that stands out.',
+            ])->random();
+        } elseif ($percentage >= 80) {
+            return collect([
+                'Strong performance with good technique.',
+                'Well-executed with room for minor improvements.',
+                'Solid presentation with confident delivery.',
+                'Good performance showing clear preparation.',
+            ])->random();
+        } elseif ($percentage >= 70) {
+            return collect([
+                'Adequate performance with some areas needing work.',
+                'Shows potential but needs more consistency.',
+                'Fair execution with room for improvement.',
+                'Average performance with mixed results.',
+            ])->random();
+        } else {
+            return collect([
+                'Performance needs significant improvement.',
+                'Requires more preparation and practice.',
+                'Below expectations in several areas.',
+                'Needs to work on fundamental skills.',
+            ])->random();
         }
     }
 }

@@ -14,7 +14,7 @@ use App\Http\Requests\EventRequest\FinalizeEventRequest;
 use App\Http\Requests\EventRequest\ResetEventRequest;
 use App\Http\Requests\EventRequest\ShowEventRequest;
 use App\Http\Resources\EventResource;
-use App\Jobs\DeleteJudgeAccounts;
+use App\Jobs\ClearJudgePinCodes;
 use App\Events\EventStatusUpdated;
 use App\Events\EventFinalized;
 use Illuminate\Support\Facades\Log;
@@ -277,7 +277,9 @@ class EventController extends Controller
                     'trace' => $e->getTraceAsString(),
                 ]);
             }
-            DeleteJudgeAccounts::dispatch($event->event_id)->delay(now()->addMinute());
+
+            // Clear judge pin codes instead of deleting accounts
+            ClearJudgePinCodes::dispatch($event->event_id)->delay(now()->addMinute());
 
             $event->load('createdBy')->loadCount(['candidates', 'judges', 'categories']);
 
