@@ -299,7 +299,7 @@ class AuthController extends Controller
             }
 
             // Use a hardcoded frontend URL temporarily to test if env() is the issue
-            $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+            $frontendUrl = env('FRONTEND_URL');
             
             // Construct redirect path
             $redirectPath = $role === 'admin' ? '/admin/dashboard' : '/tabulator/dashboard';
@@ -314,7 +314,7 @@ class AuthController extends Controller
             ]);
             
             // Redirect with hardcoded URL to avoid env() issues
-            return redirect('http://localhost:5173/login/admin?error=google_auth_failed');
+            return redirect($frontendUrl . '/login/admin?error=google_auth_failed');
         }
     }
 }
