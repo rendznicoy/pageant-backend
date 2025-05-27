@@ -19,7 +19,7 @@ return new class extends Migration
             $table->foreignId('event_id')->constrained('events', 'event_id')->onDelete('cascade');
 
             // Unique PIN code for event access
-            $table->string('pin_code', 6)->unique();
+            $table->string('pin_code', 6)->unique()->nullable();
 
             $table->timestamps();
         });

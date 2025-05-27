@@ -257,11 +257,7 @@ class AuthController extends Controller
             $email = strtolower($googleUser->getEmail());
 
             // VSU emails get admin, others get a different default role
-            if (str_ends_with($email, '@vsu.edu.ph')) {
-                $role = $email === '21-1-01027@vsu.edu.ph' ? 'admin' : 'tabulator';
-            } else {
-                $role = 'tabulator';
-            }
+            $role = $email === '21-1-01027@vsu.edu.ph' ? 'admin' : 'tabulator';
             
             // Get Google profile photo URL
             $profilePhotoUrl = $googleUser->getAvatar();

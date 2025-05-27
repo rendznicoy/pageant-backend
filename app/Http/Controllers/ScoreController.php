@@ -496,9 +496,9 @@ class ScoreController extends Controller
                     'candidate_number' => $candidate->candidate_number,
                     'team' => $candidate->team,
                     'is_active' => $candidate->is_active,
-                ],
+                ],            
                 'sex' => $candidate->sex,
-                'mean_rating' => round($meanRating, 2),
+                'mean_rating' => number_format($meanRating, 2, '.', ''), // Ensure 2 decimal places
                 'judge_scores' => [],
                 'category_scores' => $categoryScores,
             ];
@@ -547,7 +547,7 @@ class ScoreController extends Controller
         // Step 6: Calculate Mean Rank for each candidate
         foreach ($results as &$result) {
             if (!empty($result['judge_ranks'])) {
-                $result['mean_rank'] = array_sum($result['judge_ranks']) / count($result['judge_ranks']);
+                $result['mean_rank'] = number_format(array_sum($result['judge_ranks']) / count($result['judge_ranks']), 2, '.', '');
             } else {
                 $result['mean_rank'] = 999; // High number for no scores
             }
