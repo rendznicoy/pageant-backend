@@ -158,8 +158,14 @@ class EventController extends Controller
             }
 
             // Handle statisticians change
-            $incomingStats = $request->input('statisticians');
-            $hasChangedStatisticians = $incomingStats !== $event->statisticians;
+            $hasChangedStatisticians = false;
+            if ($request->has('statisticians')) {
+                $incomingStats = $request->input('statisticians');
+                if ($incomingStats !== $event->statisticians) {
+                    $event->statisticians = $incomingStats;
+                    $hasChangedStatisticians = true;
+                }
+            }
 
             // Save changes
             if (empty($updateData) && !$hasChangedStatisticians) {
@@ -200,10 +206,11 @@ class EventController extends Controller
         try {
             $validated = $request->validated();
             $event = Event::where('event_id', $validated['event_id'])->firstOrFail();
-            $validated['statisticians'] = json_decode($request->input('statisticians'), true);
+
             if ($event->cover_photo) {
                 Storage::disk('public')->delete($event->cover_photo);
             }
+
             $event->delete();
 
             return response()->json(['message' => 'Event deleted successfully.'], 204);
