@@ -71,6 +71,7 @@ Route::prefix('v1')->group(function () {
                     Route::post('/{stage_id}/reset-top-candidates', [StageController::class, 'resetTopCandidates']);
                     Route::get('/{stage_id}/partial-results', [StageController::class, 'partialResults']);
                     Route::get('/{stage_id}/category-results', [StageController::class, 'categoryResults']);
+                    Route::get('/{stage_id}/partial-results-active', [StageController::class, 'partialResultsActive']);
                 });
 
                 Route::prefix('categories')->group(function () {
