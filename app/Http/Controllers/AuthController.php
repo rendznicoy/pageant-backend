@@ -256,25 +256,17 @@ class AuthController extends Controller
             $googleUser = Socialite::driver('google')->user();
             $email = strtolower($googleUser->getEmail());
 
-            // VSU emails get admin, others get a different default role
             $role = $email === '21-1-01027@vsu.edu.ph' ? 'admin' : 'tabulator';
-            
-            // Get Google profile photo URL
+
             $profilePhotoUrl = $googleUser->getAvatar();
-            
-            // Some Google avatars include size parameters - let's make sure we get a decent size
             if ($profilePhotoUrl && strpos($profilePhotoUrl, 'googleusercontent.com') !== false) {
-                // Remove any existing size parameters
                 $profilePhotoUrl = preg_replace('/=s\d+-c/', '', $profilePhotoUrl);
-                // Add our own size parameter for a larger image
                 $profilePhotoUrl .= '=s400-c';
             }
 
-            // Check if user already exists
             $existingUser = User::where('email', $email)->first();
 
             if ($existingUser) {
-                // Update Google ID, role, profile photo and mark email verified
                 $existingUser->update([
                     'google_id' => $googleUser->id,
                     'role' => $role,
@@ -283,7 +275,6 @@ class AuthController extends Controller
                 ]);
                 Auth::login($existingUser);
             } else {
-                // Create new user
                 $newUser = User::create([
                     'first_name' => explode(' ', $googleUser->name)[0] ?? '',
                     'last_name' => explode(' ', $googleUser->name)[1] ?? '',
@@ -298,23 +289,19 @@ class AuthController extends Controller
                 Auth::login($newUser);
             }
 
-            // Use a hardcoded frontend URL temporarily to test if env() is the issue
-            $frontendUrl = env('FRONTEND_URL');
-            
-            // Construct redirect path
+            $frontendUrl = env('FRONTEND_URL'); // Ensure this is set in .env
+
             $redirectPath = $role === 'admin' ? '/admin/dashboard' : '/tabulator/dashboard';
-            
-            // Return explicit redirect
             return redirect($frontendUrl . $redirectPath);
 
         } catch (\Exception $e) {
-            // Log the error for debugging
             Log::error('Google authentication error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
             ]);
-            
-            // Redirect with hardcoded URL to avoid env() issues
+
+            // Redirect with appropriate error param
+            $frontendUrl = env('FRONTEND_URL');
             return redirect($frontendUrl . '/login/admin?error=google_auth_failed');
         }
-    }
+    }   
 }
