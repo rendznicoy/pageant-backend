@@ -21,10 +21,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Force HTTPS in production
-        if (app()->environment('production')) {
-            URL::forceScheme('https');
-        }
+        // Temporarily comment this out for testing
+    // if (app()->environment('production')) {
+    //     URL::forceScheme('https');
+    // }
 
         if (app()->runningInConsole() && config('database.default') !== null) {
             try {
@@ -32,7 +32,6 @@ class AppServiceProvider extends ServiceProvider
                     ->where('created_at', '<', now()->subDay())
                     ->delete();
             } catch (\Exception $e) {
-                // Avoid crashing during build/deploy
                 logger()->warning('Skipping DB cleanup during package:discover: ' . $e->getMessage());
             }
         }

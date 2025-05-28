@@ -49,7 +49,7 @@ class EventResource extends JsonResource
                 : Carbon::parse($this->end_date)->toDateTimeString(),
             'status' => $this->status,
             'division' => $this->division,
-            'cover_photo' => $this->cover_photo_url,
+            'cover_photo' => $this->getCoverPhotoUrl(), // Use helper method
             'description' => $this->description,
             'created_by' => $this->whenLoaded('createdBy', fn() => [
                 'user_id' => $this->createdBy?->user_id,
@@ -60,7 +60,7 @@ class EventResource extends JsonResource
             'judges_count' => $this->whenCounted('judges', fn() => $this->judges_count),
             'categories_count' => $this->whenCounted('categories', fn() => $this->categories_count),
             'active_categories_count' => $this->categories()->where('status', 'active')->count(),
-            'judges_with_pending_scores' => $pendingJudges,
+            'judges_with_pending_scores' => $pendingJudges ?? [],
             'statisticians' => $this->statisticians,
         ];
     }
@@ -71,12 +71,12 @@ class EventResource extends JsonResource
             return null;
         }
         
-        // If it's already a full URL, return as is
-        if (str_starts_with($this->cover_photo, 'http')) {
-            return $this->cover_photo;
-        }
+        // Always return the full production URL regardless of request origin
+        $baseUrl = config('app.url');
         
-        // If it's a relative path, build the proper URL
-        return secure_url('storage/' . $this->cover_photo);
+        // Make sure baseUrl doesn't end with slash
+        $baseUrl = rtrim($baseUrl, '/');
+        
+        return $baseUrl . '/storage/' . $this->cover_photo;
     }
 }
