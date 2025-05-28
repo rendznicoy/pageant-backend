@@ -21,9 +21,9 @@ class Event extends Model
         'end_date',
         'status',
         'created_by',
-        'cover_photo', 
-        'cover_photo_url',      // New: Store Cloudinary URL
-        'cover_photo_public_id',
+        'cover_photo',           // Keep for backward compatibility
+        'cover_photo_url',       // New Cloudinary URL
+        'cover_photo_public_id', // New Cloudinary public ID
         'description',
         'division',
         'statisticians',
@@ -43,8 +43,6 @@ class Event extends Model
         'deleted_at' => 'datetime',
         'statisticians' => 'array',
         'global_max_score' => 'integer', 
-        'cover_photo_url' => 'string',
-        'cover_photo_public_id' => 'string',
     ];
 
     public function getStartDateAttribute($value)

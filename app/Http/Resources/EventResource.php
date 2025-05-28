@@ -1,4 +1,5 @@
 <?php
+// app/Http/Resources/EventResource.php
 
 namespace App\Http\Resources;
 
@@ -66,54 +67,35 @@ class EventResource extends JsonResource
     }
 
     /**
-     * Get the proper cover photo URL
+     * Get the proper cover photo URL - handles both Cloudinary and legacy storage
      */
     private function getCoverPhotoUrl(): ?string
     {
-        // Priority 1: New Cloudinary URL
-        if ($this->cover_photo_url) {
+        // Priority 1: New Cloudinary URL field
+        if (!empty($this->cover_photo_url)) {
             return $this->cover_photo_url;
         }
 
         // Priority 2: Legacy cover_photo field
-        if ($this->cover_photo) {
-            // If it's already a full URL, return as-is
-            if (str_starts_with($this->cover_photo, 'http://') || str_starts_with($this->cover_photo, 'https://')) {
+        if (!empty($this->cover_photo)) {
+            // If it's already a full URL (starts with http), return as-is
+            if (filter_var($this->cover_photo, FILTER_VALIDATE_URL)) {
                 return $this->cover_photo;
             }
 
-            // If it's a Cloudinary URL pattern, return as-is
-            if (str_contains($this->cover_photo, 'cloudinary.com')) {
+            // If it contains a domain, it's likely already a full URL
+            if (str_contains($this->cover_photo, '.com') || str_contains($this->cover_photo, '.net') || str_contains($this->cover_photo, '.org')) {
+                // Add https:// if it's missing
+                if (!str_starts_with($this->cover_photo, 'http')) {
+                    return 'https://' . $this->cover_photo;
+                }
                 return $this->cover_photo;
             }
 
-            // Otherwise, construct local storage URL
-            return asset('storage/' . $this->cover_photo);
+            // Otherwise, treat as local storage path
+            return asset('storage/' . ltrim($this->cover_photo, '/'));
         }
 
         return null;
     }
 }
-
-    /* private function getCoverPhotoUrl()
-    {
-        // First check if we have a Cloudinary URL
-        if ($this->cover_photo_url) {
-            return $this->cover_photo_url;
-        }
-        
-        // Fallback to legacy cover_photo field if it exists
-        if ($this->cover_photo) {
-            // Check if it's already a full URL
-            if (filter_var($this->cover_photo, FILTER_VALIDATE_URL)) {
-                return $this->cover_photo;
-            }
-            
-            // If it's a relative path, generate the URL
-            return Storage::url($this->cover_photo);
-        }
-        
-        // No cover photo available
-        return null;
-    }
-} */
