@@ -28,6 +28,11 @@ class CloudinaryService
     public function upload(UploadedFile $file, string $folder = 'uploads', array $options = []): ?array
     {
         try {
+            Log::info('CloudinaryService upload started', [
+                'folder' => $folder,
+                'filename' => $file->getClientOriginalName()
+            ]);
+
             $uploadOptions = array_merge([
                 'folder' => $folder,
                 'resource_type' => 'auto',
@@ -37,6 +42,11 @@ class CloudinaryService
 
             $result = $this->cloudinary->uploadApi()->upload($file->getPathname(), $uploadOptions);
             
+            Log::info('Cloudinary upload successful', [
+                'public_id' => $result['public_id'],
+                'url' => $result['secure_url']
+            ]);
+            
             return [
                 'public_id' => $result['public_id'],
                 'url' => $result['secure_url'],
@@ -44,7 +54,9 @@ class CloudinaryService
                 'height' => $result['height'] ?? null,
             ];
         } catch (\Exception $e) {
-            Log::error('Cloudinary upload failed: ' . $e->getMessage());
+            Log::error('Cloudinary upload failed: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return null;
         }
     }
