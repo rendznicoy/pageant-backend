@@ -49,7 +49,6 @@ class EventResource extends JsonResource
                 : Carbon::parse($this->end_date)->toDateTimeString(),
             'status' => $this->status,
             'division' => $this->division,
-            // Fix the cover_photo URL construction
             'cover_photo' => $this->getCoverPhotoUrl(),
             'description' => $this->description,
             'created_by' => $this->whenLoaded('createdBy', fn() => [
@@ -71,27 +70,28 @@ class EventResource extends JsonResource
      */
     private function getCoverPhotoUrl(): ?string
     {
-        if (!$this->cover_photo) {
-            return null;
+        // Priority 1: New Cloudinary URL
+        if ($this->cover_photo_url) {
+            return $this->cover_photo_url;
         }
 
-        // If it's already a full URL (starts with http:// or https://), return as-is
-        if (str_starts_with($this->cover_photo, 'http://') || str_starts_with($this->cover_photo, 'https://')) {
-            return $this->cover_photo;
+        // Priority 2: Legacy cover_photo field
+        if ($this->cover_photo) {
+            // If it's already a full URL, return as-is
+            if (str_starts_with($this->cover_photo, 'http://') || str_starts_with($this->cover_photo, 'https://')) {
+                return $this->cover_photo;
+            }
+
+            // If it's a Cloudinary URL pattern, return as-is
+            if (str_contains($this->cover_photo, 'cloudinary.com')) {
+                return $this->cover_photo;
+            }
+
+            // Otherwise, construct local storage URL
+            return asset('storage/' . $this->cover_photo);
         }
 
-        // If it's a Cloudinary URL pattern, return as-is
-        if (str_contains($this->cover_photo, 'cloudinary.com')) {
-            return $this->cover_photo;
-        }
-
-        // If it starts with 'storage/', it's a local path - construct URL
-        if (str_starts_with($this->cover_photo, 'storage/')) {
-            return asset($this->cover_photo);
-        }
-
-        // Otherwise, assume it's a relative path in the public disk
-        return asset('storage/' . $this->cover_photo);
+        return null;
     }
 }
 
