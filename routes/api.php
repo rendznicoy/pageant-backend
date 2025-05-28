@@ -44,6 +44,8 @@ Route::prefix('v1')->group(function () {
         Route::post('users', [UserController::class, 'store']);
         Route::patch('users/{user_id}', [UserController::class, 'update']);
         Route::delete('users/{user_id}', [UserController::class, 'destroy']);
+        Route::post('users/bulk-delete', [UserController::class, 'bulkDelete']); // Add this line
+        Route::patch('users/profile', [UserController::class, 'updateProfile']); // Add this if missing
     });
 
     // Admin and Tabulator-only routes

@@ -48,10 +48,26 @@ class UserController extends Controller
         if ($request->hasFile('profile_photo')) {
             $file = $request->file('profile_photo');
             if ($file->isValid()) {
-                $uploadResult = $this->cloudinaryService->upload($file, 'profile_photos');
+                $uploadResult = $this->cloudinaryService->upload($file, 'profile_photos', [
+                    'transformation' => [
+                        'width' => 400,
+                        'height' => 400,
+                        'crop' => 'fill',
+                        'gravity' => 'face',
+                        'quality' => 'auto',
+                        'fetch_format' => 'auto'
+                    ]
+                ]);
+                
                 if ($uploadResult) {
                     $data['profile_photo_url'] = $uploadResult['url'];
                     $data['profile_photo_public_id'] = $uploadResult['public_id'];
+                } else {
+                    // Fallback to local storage if Cloudinary fails
+                    Log::warning('Cloudinary upload failed, falling back to local storage', [
+                        'user_data' => $data['email'] ?? 'unknown'
+                    ]);
+                    $data['profile_photo'] = $file->store('profile_photos', 'public');
                 }
             }
         }
@@ -69,21 +85,19 @@ class UserController extends Controller
         $user = $request->user()->fresh();
         Log::info('User from token:', ['user' => $user]);
 
-        // Handle Google profile photo if needed
+        // Handle Google profile photo if needed - SAVE THE CHANGES
         if (
             $user->profile_photo &&
             filter_var($user->profile_photo, FILTER_VALIDATE_URL) &&
-            strpos($user->profile_photo, 'google') !== false
+            strpos($user->profile_photo, 'google') !== false &&
+            !$user->profile_photo_url // Only if no Cloudinary URL exists
         ) {
-            // If you want to keep the Google URL, you can store it in profile_photo_url
-            if (!$user->profile_photo_url) {
-                $user->profile_photo_url = $user->profile_photo;
-            }
+            $user->profile_photo_url = $user->profile_photo;
+            $user->save(); // Add this line to persist the change
         }
 
         Log::info('Final profile photo path:', ['photo' => $user->profile_photo]);
 
-        // Return UserResource which will NOT be wrapped due to $wrap = null
         return new UserResource($user);
     }
 
