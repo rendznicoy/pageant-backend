@@ -72,31 +72,32 @@ class EventResource extends JsonResource
      */
     private function getCoverPhotoUrl(): ?string
     {
-        // Debug: Log the actual values
-        Log::info("Event {$this->event_id} image fields:", [
+        // Debug logging
+        Log::info("Event {$this->event_id} debug:", [
             'cover_photo' => $this->cover_photo,
-            'cover_photo_url' => $this->cover_photo_url,
-            'cover_photo_public_id' => $this->cover_photo_public_id,
+            'cover_photo_url' => $this->cover_photo_url ?? 'FIELD_NOT_FOUND',
+            'cover_photo_public_id' => $this->cover_photo_public_id ?? 'FIELD_NOT_FOUND',
+            'all_attributes' => array_keys($this->getAttributes()),
         ]);
 
-        // Priority 1: New Cloudinary URL field
-        if (!empty($this->cover_photo_url)) {
+        // Check if the field exists on the model
+        if (property_exists($this, 'cover_photo_url') && !empty($this->cover_photo_url)) {
             return $this->cover_photo_url;
         }
 
-        // Priority 2: Legacy cover_photo field
-        if (!empty($this->cover_photo)) {
-            // Skip temporary files
-            if (str_contains($this->cover_photo, '/tmp/')) {
-                return null;
-            }
+        // Fallback to direct attribute access
+        if (isset($this->attributes['cover_photo_url']) && !empty($this->attributes['cover_photo_url'])) {
+            return $this->attributes['cover_photo_url'];
+        }
 
-            // If it's already a full URL, return as-is
+        // Handle legacy field
+        if (!empty($this->cover_photo)) {
+            if (str_contains($this->cover_photo, '/tmp/')) {
+                return null; // Skip temp files
+            }
             if (str_starts_with($this->cover_photo, 'http')) {
                 return $this->cover_photo;
             }
-
-            // Otherwise treat as local storage
             return asset('storage/' . ltrim($this->cover_photo, '/'));
         }
 
