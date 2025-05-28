@@ -42,7 +42,7 @@ class Event extends Model
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
         'statisticians' => 'array',
-        'global_max_score' => 'integer', 
+        'global_max_score' => 'integer',
     ];
 
     public function getStartDateAttribute($value)
