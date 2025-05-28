@@ -23,6 +23,10 @@ use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 |
 */
 
+Route::get('/csrf-cookie', function () {
+    return response()->json(['message' => 'CSRF cookie set']);
+})->middleware('web');
+
 Route::prefix('v1')->group(function () {
     // Public Auth Routes
     Route::post('login', [AuthController::class, 'login']);
