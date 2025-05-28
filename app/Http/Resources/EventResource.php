@@ -71,35 +71,32 @@ class EventResource extends JsonResource
      */
     private function getCoverPhotoUrl(): ?string
     {
-        // Method 1: Try to access cover_photo_url directly
-        $cloudinaryUrl = $this->resource->cover_photo_url ?? null;
-        if (!empty($cloudinaryUrl)) {
-            return $cloudinaryUrl;
-        }
-
-        // Method 2: Try accessing via attributes array
+        // Get raw database attributes to avoid model accessors
         $attributes = $this->resource->getAttributes();
+        
+        // Priority 1: Cloudinary URL
         if (!empty($attributes['cover_photo_url'])) {
             return $attributes['cover_photo_url'];
         }
-
-        // Method 3: Try the old cover_photo field
-        $coverPhoto = $this->resource->cover_photo ?? null;
-        if (!empty($coverPhoto)) {
+        
+        // Priority 2: Legacy cover_photo field (skip temp files)
+        if (!empty($attributes['cover_photo'])) {
+            $coverPhoto = $attributes['cover_photo'];
+            
             // Skip temporary files
             if (str_contains($coverPhoto, '/tmp/')) {
                 return null;
             }
-
+            
             // If it's already a full URL, return as-is
             if (str_starts_with($coverPhoto, 'http')) {
                 return $coverPhoto;
             }
-
-            // Treat as local storage path
+            
+            // Build local storage URL
             return asset('storage/' . ltrim($coverPhoto, '/'));
         }
-
+        
         return null;
     }
 }
