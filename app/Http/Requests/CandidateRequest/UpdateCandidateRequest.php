@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Log;
 
 class UpdateCandidateRequest extends FormRequest
 {
+    /**
+     * Determine if the user is authorized to make this request.
+     */
     public function authorize(): bool
     {
         $user = auth()->user();
@@ -28,11 +31,14 @@ class UpdateCandidateRequest extends FormRequest
 
         $data = [];
 
-        // Get route parameters
-        $data['candidate_id'] = (int) $this->route('candidate_id');
-        $data['event_id'] = (int) $this->route('event_id');
+        if ($this->has('candidate_id')) {
+            $data['candidate_id'] = intval($this->candidate_id);
+        }
 
-        // Handle form data
+        if ($this->has('event_id')) {
+            $data['event_id'] = intval($this->event_id);
+        }
+
         if ($this->has('is_active')) {
             $data['is_active'] = filter_var($this->is_active, FILTER_VALIDATE_BOOLEAN);
         }
@@ -44,6 +50,11 @@ class UpdateCandidateRequest extends FormRequest
         $this->merge($data);
     }
 
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     */
     public function rules(): array
     {
         return [
@@ -55,7 +66,7 @@ class UpdateCandidateRequest extends FormRequest
             'sex' => 'sometimes|required|in:M,F',
             'team' => 'nullable|string',
             'photo' => 'sometimes|nullable|image|max:10240|mimes:png,jpg,jpeg',
-            'is_active' => 'sometimes|boolean',
+            'is_active' => 'required|boolean',
         ];
     }
 

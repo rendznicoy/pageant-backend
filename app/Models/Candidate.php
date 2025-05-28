@@ -21,8 +21,9 @@ class Candidate extends Model
         'candidate_number',
         'sex',
         'team',
-        'photo_url',        // New: Cloudinary URL
-        'photo_public_id',  // New: Cloudinary public_id
+        'photo', // Keep for backward compatibility
+        'photo_url', // New Cloudinary URL
+        'photo_public_id', // New Cloudinary public ID
         'is_active',
     ];
 
@@ -43,10 +44,17 @@ class Candidate extends Model
         return $this->hasMany(Score::class, 'candidate_id');
     }
 
+    // Update the photo accessor to prioritize Cloudinary URL
     public function getPhotoUrlAttribute()
     {
+        // If we have a Cloudinary URL, use it
+        if ($this->attributes['photo_url']) {
+            return $this->attributes['photo_url'];
+        }
+
+        // Fallback to local storage if exists
         if (is_string($this->photo) && Storage::exists($this->photo)) {
-            return Storage::url($this->photo); // For uploaded images
+            return Storage::url($this->photo);
         }
 
         // Optional fallback: base64 encode if BLOB
