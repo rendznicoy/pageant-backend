@@ -15,13 +15,14 @@ return [
     |
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
-
-    'credentials' => true,
+    'paths' => ['api/*', 'sanctum/csrf-cookie', 'api/csrf-cookie'], // Added api/csrf-cookie
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [env('FRONTEND_URL', 'http://localhost:5173')],
+    'allowed_origins' => [
+        env('FRONTEND_URL', 'https://pageant-scoring-vsu.up.railway.app'), // Added fallback
+        'http://localhost:5173', // Keep for local development
+    ],
 
     'allowed_origins_patterns' => [],
 
@@ -31,6 +32,6 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => true,
+    'supports_credentials' => true, // This was 'credentials' => true (wrong property name)
 
 ];
