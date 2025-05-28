@@ -21,6 +21,7 @@ class Event extends Model
         'end_date',
         'status',
         'created_by',
+        'cover_photo', 
         'cover_photo_url',      // New: Store Cloudinary URL
         'cover_photo_public_id',
         'description',
