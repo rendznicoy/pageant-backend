@@ -21,10 +21,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Temporarily comment this out for testing
-    // if (app()->environment('production')) {
-    //     URL::forceScheme('https');
-    // }
+        if (env('APP_ENV') === 'production') {
+            URL::forceScheme('https');
+        }
 
         if (app()->runningInConsole() && config('database.default') !== null) {
             try {
