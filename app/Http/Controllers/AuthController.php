@@ -314,6 +314,7 @@ class AuthController extends Controller
             ]);
             
             // Redirect with hardcoded URL to avoid env() issues
+            $frontendUrl = env('FRONTEND_URL');
             return redirect($frontendUrl . '/login/admin?error=google_auth_failed');
         }
     }
