@@ -196,7 +196,7 @@ class UserController extends Controller
         ]);
     }
 
-    public function bulkDelete(Request $request)
+    /* public function bulkDelete(Request $request)
     {
         $request->validate([
             'user_ids' => 'required|array|min:1',
@@ -240,7 +240,7 @@ class UserController extends Controller
             'success' => $success,
             'failed' => $failed,
         ]);
-    }
+    } */
 
     /* protected function proxyGoogleProfilePhoto($googleUrl)
     {
