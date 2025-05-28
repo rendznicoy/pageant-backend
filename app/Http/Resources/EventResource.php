@@ -71,28 +71,24 @@ class EventResource extends JsonResource
      */
     private function getCoverPhotoUrl(): ?string
     {
-        // Priority 1: New Cloudinary URL field
+        // New Cloudinary field takes priority
         if (!empty($this->cover_photo_url)) {
             return $this->cover_photo_url;
         }
 
-        // Priority 2: Legacy cover_photo field
+        // For legacy cover_photo field
         if (!empty($this->cover_photo)) {
-            // If it's already a full URL (starts with http), return as-is
-            if (filter_var($this->cover_photo, FILTER_VALIDATE_URL)) {
+            // If it contains /tmp/, it's a temporary file - ignore it
+            if (str_contains($this->cover_photo, '/tmp/')) {
+                return null;
+            }
+
+            // If it's already a complete URL, return as-is
+            if (str_starts_with($this->cover_photo, 'http')) {
                 return $this->cover_photo;
             }
 
-            // If it contains a domain, it's likely already a full URL
-            if (str_contains($this->cover_photo, '.com') || str_contains($this->cover_photo, '.net') || str_contains($this->cover_photo, '.org')) {
-                // Add https:// if it's missing
-                if (!str_starts_with($this->cover_photo, 'http')) {
-                    return 'https://' . $this->cover_photo;
-                }
-                return $this->cover_photo;
-            }
-
-            // Otherwise, treat as local storage path
+            // Otherwise treat as local storage
             return asset('storage/' . ltrim($this->cover_photo, '/'));
         }
 
