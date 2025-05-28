@@ -49,9 +49,7 @@ class EventResource extends JsonResource
                 : Carbon::parse($this->end_date)->toDateTimeString(),
             'status' => $this->status,
             'division' => $this->division,
-            'cover_photo' => $this->cover_photo 
-                ? secure_url('storage/' . $this->cover_photo) // Use secure_url instead of Storage::url
-                : null,
+            'cover_photo' => $this->getCoverPhotoUrl(), // Use helper method
             'description' => $this->description,
             'created_by' => $this->whenLoaded('createdBy', fn() => [
                 'user_id' => $this->createdBy?->user_id,
@@ -65,5 +63,20 @@ class EventResource extends JsonResource
             'judges_with_pending_scores' => $pendingJudges,
             'statisticians' => $this->statisticians,
         ];
+    }
+
+    private function getCoverPhotoUrl()
+    {
+        if (!$this->cover_photo) {
+            return null;
+        }
+        
+        // If it's already a full URL, return as is
+        if (str_starts_with($this->cover_photo, 'http')) {
+            return $this->cover_photo;
+        }
+        
+        // If it's a relative path, build the proper URL
+        return secure_url('storage/' . $this->cover_photo);
     }
 }
