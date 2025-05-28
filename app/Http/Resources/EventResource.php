@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use App\Models\Judge;
 use App\Models\Score;
+use Illuminate\Support\Facades\Log;
 
 class EventResource extends JsonResource
 {
@@ -70,13 +71,28 @@ class EventResource extends JsonResource
         if (!$this->cover_photo) {
             return null;
         }
+
+        // Debug info
+        Log::info('Cover photo debug', [
+            'cover_photo' => $this->cover_photo,
+            'app_url' => config('app.url'),
+            'environment' => app()->environment(),
+            'storage_url' => Storage::url($this->cover_photo),
+        ]);
         
         // Check if it's already a full URL
         if (filter_var($this->cover_photo, FILTER_VALIDATE_URL)) {
             return $this->cover_photo;
         }
         
-        // If it's a relative path, generate the URL
-        return Storage::url($this->cover_photo);
+        // Generate URL with proper scheme
+        $url = Storage::url($this->cover_photo);
+        
+        // Force HTTPS in production
+        if (app()->environment('production') && str_starts_with($url, 'http://')) {
+            $url = str_replace('http://', 'https://', $url);
+        }
+        
+        return $url;
     }
 }
