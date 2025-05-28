@@ -18,8 +18,9 @@ class User extends Authenticatable
         'password',
         'role',
         'email_verified_at',
-        'profile_photo_url',      // New: Cloudinary URL
-        'profile_photo_public_id', // New: Cloudinary public_id
+        'profile_photo', // Keep for backward compatibility
+        'profile_photo_url', // New Cloudinary URL
+        'profile_photo_public_id', // New Cloudinary public ID
     ];
     protected $attributes = [
         'role' => 'judge',

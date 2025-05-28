@@ -34,60 +34,72 @@ class JudgeController extends Controller
         return response()->json(['data' => JudgeResource::collection($judges)]);
     }
 
-    public function store(StoreJudgeRequest $request)
+    public function store(StoreJudgeRequest $request, $event_id)
     {
-        $data = $request->validated();
+        try {
+            $data = $request->validated();
+            $data['event_id'] = $event_id; // Set from route parameter
 
-        $event = Event::find($data['event_id']);
-        if (!$event) {
-            return response()->json(['message' => 'Event not found.'], 404);
-        }
+            $event = Event::find($event_id);
+            if (!$event) {
+                return response()->json(['message' => 'Event not found.'], 404);
+            }
 
-        $username = strtolower(explode('@', $request->email)[0]);
-        $originalUsername = $username;
-        $counter = 1;
-        while (User::where('username', $username)->exists()) {
-            $username = $originalUsername . $counter++;
-        }
+            $username = strtolower(explode('@', $request->email)[0]);
+            $originalUsername = $username;
+            $counter = 1;
+            while (User::where('username', $username)->exists()) {
+                $username = $originalUsername . $counter++;
+            }
 
-        $userData = [
-            'username' => $username,
-            'email' => $request->email,
-            'first_name' => $request->first_name,
-            'last_name' => $request->last_name,
-            'role' => 'judge',
-            'password' => null,
-        ];
-
-        // Handle Cloudinary photo upload
-        if ($request->hasFile('photo')) {
-            $file = $request->file('photo');
-            if ($file->isValid()) {
-                $uploadResult = $this->cloudinaryService->upload($file, 'profile_photos');
+            // Handle Cloudinary photo upload
+            $photoUrl = null;
+            $photoPublicId = null;
+            if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
+                $uploadResult = $this->cloudinaryService->upload($request->file('photo'), 'judge_photos');
                 if ($uploadResult) {
-                    $userData['profile_photo_url'] = $uploadResult['url'];
-                    $userData['profile_photo_public_id'] = $uploadResult['public_id'];
+                    $photoUrl = $uploadResult['url'];
+                    $photoPublicId = $uploadResult['public_id'];
                 }
             }
+
+            $user = User::create([
+                'username' => $username,
+                'email' => $request->email,
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'role' => 'judge',
+                'password' => null,
+                'profile_photo_url' => $photoUrl,
+                'profile_photo_public_id' => $photoPublicId,
+            ]);
+
+            do {
+                $pin = strtoupper(Str::random(6));
+            } while (Judge::where('pin_code', $pin)->exists());
+
+            $judge = Judge::create([
+                'event_id' => $event_id,
+                'user_id' => $user->user_id,
+                'pin_code' => $pin,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Judge created successfully.',
+                'data' => new JudgeResource($judge),
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to create judge', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'message' => 'Failed to create judge: ' . $e->getMessage(),
+            ], 500);
         }
-
-        $user = User::create($userData);
-
-        do {
-            $pin = strtoupper(Str::random(6));
-        } while (Judge::where('pin_code', $pin)->exists());
-
-        $judge = Judge::create([
-            'event_id' => $request->event_id,
-            'user_id' => $user->user_id,
-            'pin_code' => $pin,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Judge created successfully.',
-            'data' => new JudgeResource($judge),
-        ], 201);
     }
 
     public function show(ShowJudgeRequest $request)
@@ -140,15 +152,20 @@ class JudgeController extends Controller
                 $updated = true;
             }
 
-            // Handle new profile photo
+            // Handle Cloudinary photo upload
             if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
-                // Delete old photo if exists
-                if ($user->profile_photo && Storage::disk('public')->exists($user->profile_photo)) {
-                    Storage::disk('public')->delete($user->profile_photo);
+                // Delete old image from Cloudinary if exists
+                if ($user->profile_photo_public_id) {
+                    $this->cloudinaryService->delete($user->profile_photo_public_id);
                 }
 
-                $user->profile_photo = $request->file('photo')->store('uploads/profile_photos', 'public');
-                $updated = true;
+                // Upload new image
+                $uploadResult = $this->cloudinaryService->upload($request->file('photo'), 'judge_photos');
+                if ($uploadResult) {
+                    $user->profile_photo_url = $uploadResult['url'];
+                    $user->profile_photo_public_id = $uploadResult['public_id'];
+                    $updated = true;
+                }
             }
 
             if ($updated) {
@@ -175,28 +192,37 @@ class JudgeController extends Controller
         }
     }
 
-    public function destroy(DestroyJudgeRequest $request)
+
+    public function destroy(DestroyJudgeRequest $request, $event_id, $judge_id)
     {
-        $validated = $request->validated();
+        try {
+            $judge = Judge::where('judge_id', $judge_id)
+                ->where('event_id', $event_id)
+                ->firstOrFail();
 
-        $judge = Judge::where('judge_id', $validated['judge_id'])
-            ->where('event_id', $validated['event_id'])
-            ->firstOrFail();
+            $user = $judge->user;
 
-        $user = $judge->user;
+            // Delete the judge first
+            $judge->delete();
 
-        // Delete profile photo from Cloudinary
-        if ($user && $user->profile_photo_public_id) {
-            $this->cloudinaryService->delete($user->profile_photo_public_id);
+            // Delete image from Cloudinary and then the user
+            if ($user) {
+                if ($user->profile_photo_public_id) {
+                    $this->cloudinaryService->delete($user->profile_photo_public_id);
+                }
+                $user->delete();
+            }
+
+            return response()->json(['message' => 'Judge and associated user deleted successfully.'], 204);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to delete judge', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json(['message' => 'Failed to delete judge: ' . $e->getMessage()], 500);
         }
-
-        $judge->delete();
-
-        if ($user) {
-            $user->delete();
-        }
-
-        return response()->json(['message' => 'Judge and associated user deleted successfully.'], 204);
     }
 
     public function currentSession(Request $request)
