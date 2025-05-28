@@ -14,6 +14,7 @@ class EventResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        // Get judges data
         $judges = Judge::where('event_id', $this->event_id)->with('user')->get();
 
         $pendingJudges = [];
@@ -50,7 +51,7 @@ class EventResource extends JsonResource
                 : Carbon::parse($this->end_date)->toDateTimeString(),
             'status' => $this->status,
             'division' => $this->division,
-            'cover_photo' => $this->cover_photo_url, // Use Cloudinary URL
+            'cover_photo' => $this->getCoverPhotoUrl(), // This calls our method
             'description' => $this->description,
             'created_by' => $this->whenLoaded('createdBy', fn() => [
                 'user_id' => $this->createdBy?->user_id,
@@ -68,31 +69,23 @@ class EventResource extends JsonResource
 
     private function getCoverPhotoUrl()
     {
-        if (!$this->cover_photo) {
-            return null;
-        }
-
-        // Debug info
-        Log::info('Cover photo debug', [
-            'cover_photo' => $this->cover_photo,
-            'app_url' => config('app.url'),
-            'environment' => app()->environment(),
-            'storage_url' => Storage::url($this->cover_photo),
-        ]);
-        
-        // Check if it's already a full URL
-        if (filter_var($this->cover_photo, FILTER_VALIDATE_URL)) {
-            return $this->cover_photo;
+        // First check if we have a Cloudinary URL
+        if ($this->cover_photo_url) {
+            return $this->cover_photo_url;
         }
         
-        // Generate URL with proper scheme
-        $url = Storage::url($this->cover_photo);
-        
-        // Force HTTPS in production
-        if (app()->environment('production') && str_starts_with($url, 'http://')) {
-            $url = str_replace('http://', 'https://', $url);
+        // Fallback to legacy cover_photo field if it exists
+        if ($this->cover_photo) {
+            // Check if it's already a full URL
+            if (filter_var($this->cover_photo, FILTER_VALIDATE_URL)) {
+                return $this->cover_photo;
+            }
+            
+            // If it's a relative path, generate the URL
+            return Storage::url($this->cover_photo);
         }
         
-        return $url;
+        // No cover photo available
+        return null;
     }
 }

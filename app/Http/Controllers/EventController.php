@@ -58,15 +58,32 @@ class EventController extends Controller
             if ($request->hasFile('cover_photo')) {
                 $file = $request->file('cover_photo');
                 if ($file->isValid()) {
+                    Log::info('Uploading cover photo to Cloudinary', [
+                        'filename' => $file->getClientOriginalName(),
+                        'size' => $file->getSize()
+                    ]);
+                    
                     $uploadResult = $this->cloudinaryService->upload($file, 'event_covers');
+                    
+                    Log::info('Cloudinary upload result', [
+                        'result' => $uploadResult
+                    ]);
+                    
                     if ($uploadResult) {
                         $validated['cover_photo_url'] = $uploadResult['url'];
                         $validated['cover_photo_public_id'] = $uploadResult['public_id'];
+                        
+                        Log::info('Added Cloudinary data to validated array', [
+                            'cover_photo_url' => $uploadResult['url'],
+                            'cover_photo_public_id' => $uploadResult['public_id']
+                        ]);
                     } else {
                         throw new \Exception('Failed to upload image to Cloudinary');
                     }
                 }
             }
+            
+            Log::info('Creating event with data', $validated);
 
             $event = Event::create(array_merge($validated, ['status' => 'inactive']));
 
