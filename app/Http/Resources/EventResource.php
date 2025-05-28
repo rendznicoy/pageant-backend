@@ -8,13 +8,11 @@ use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use App\Models\Judge;
 use App\Models\Score;
-use Illuminate\Support\Facades\Log;
 
 class EventResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        // Get judges data
         $judges = Judge::where('event_id', $this->event_id)->with('user')->get();
 
         $pendingJudges = [];
@@ -51,7 +49,7 @@ class EventResource extends JsonResource
                 : Carbon::parse($this->end_date)->toDateTimeString(),
             'status' => $this->status,
             'division' => $this->division,
-            'cover_photo' => $this->getCoverPhotoUrl(), // This calls our method
+            'cover_photo' => $this->cover_photo_url, // Direct access to Cloudinary URL
             'description' => $this->description,
             'created_by' => $this->whenLoaded('createdBy', fn() => [
                 'user_id' => $this->createdBy?->user_id,
@@ -66,8 +64,9 @@ class EventResource extends JsonResource
             'statisticians' => $this->statisticians,
         ];
     }
+}
 
-    private function getCoverPhotoUrl()
+    /* private function getCoverPhotoUrl()
     {
         // First check if we have a Cloudinary URL
         if ($this->cover_photo_url) {
@@ -88,4 +87,4 @@ class EventResource extends JsonResource
         // No cover photo available
         return null;
     }
-}
+} */
