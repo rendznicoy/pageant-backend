@@ -256,11 +256,6 @@ class AuthController extends Controller
             $googleUser = Socialite::driver('google')->user();
             $email = strtolower($googleUser->getEmail());
 
-            if (!str_ends_with($email, '@vsu.edu.ph')) {
-                $frontendUrl = env('FRONTEND_URL');
-                return redirect($frontendUrl . '/login/admin?error=only_vsu_emails');
-            }
-
             $role = $email === '21-1-01027@vsu.edu.ph' ? 'admin' : 'tabulator';
             $profilePhotoUrl = $googleUser->getAvatar();
 
