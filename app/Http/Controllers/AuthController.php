@@ -318,7 +318,7 @@ class AuthController extends Controller
             }
 
             $frontendUrl = env('FRONTEND_URL');
-            $redirectPath = $role === 'admin' ? '/admin/dashboard' : '/tabulator/dashboard';
+            $redirectPath = $role === 'admin' ? '/admin/dashboard' : '/admin/dashboard';
             
             return redirect($frontendUrl . $redirectPath);
 
