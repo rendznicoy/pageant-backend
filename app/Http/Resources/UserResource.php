@@ -23,7 +23,12 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'username' => $this->username,
             'role' => $this->role,
-            'profile_photo' => $this->profile_photo_url ?: asset('uploads/profile_photos/default.png'),
+            'profile_photo' => $this->profile_photo_url ?: $this->profile_photo ?: asset('uploads/profile_photos/default.png'),
+            'profile_photo_url' => $this->profile_photo_url,
+            'google_id' => $this->google_id,
+            'email_verified_at' => $this->email_verified_at,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];    
     }
 }

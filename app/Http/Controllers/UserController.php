@@ -69,23 +69,22 @@ class UserController extends Controller
         $user = $request->user()->fresh();
         Log::info('User from token:', ['user' => $user]);
 
-        // Proxy Google profile photo to local storage if needed
+        // Handle Google profile photo if needed
         if (
             $user->profile_photo &&
             filter_var($user->profile_photo, FILTER_VALIDATE_URL) &&
             strpos($user->profile_photo, 'google') !== false
         ) {
-            $localPath = $this->proxyGoogleProfilePhoto($user->profile_photo);
-            if ($localPath) {
-                $user->profile_photo = $localPath;
+            // If you want to keep the Google URL, you can store it in profile_photo_url
+            if (!$user->profile_photo_url) {
+                $user->profile_photo_url = $user->profile_photo;
             }
         }
 
         Log::info('Final profile photo path:', ['photo' => $user->profile_photo]);
 
-        return response()->json([
-            'data' => new UserResource($user),
-        ]);
+        // Return UserResource which will NOT be wrapped due to $wrap = null
+        return new UserResource($user);
     }
 
     public function update(UpdateUserRequest $request, $user_id) 
