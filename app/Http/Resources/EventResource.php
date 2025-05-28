@@ -49,7 +49,7 @@ class EventResource extends JsonResource
                 : Carbon::parse($this->end_date)->toDateTimeString(),
             'status' => $this->status,
             'division' => $this->division,
-            'cover_photo' => $this->getCoverPhotoUrl(),
+            'cover_photo' => $this->cover_photo ? $this->getCoverPhotoUrl() : null,
             'description' => $this->description,
             'created_by' => $this->whenLoaded('createdBy', fn() => [
                 'user_id' => $this->createdBy?->user_id,
@@ -68,29 +68,17 @@ class EventResource extends JsonResource
     /**
      * Get the proper cover photo URL
      */
-    private function getCoverPhotoUrl(): ?string
+    private function getCoverPhotoUrl(): string
     {
-        if (!$this->cover_photo) {
-            return null;
-        }
-
-        // Check if it's already a full URL
-        if (filter_var($this->cover_photo, FILTER_VALIDATE_URL)) {
+        // If it's already a full URL, return as-is
+        if (filter_var($this->cover_photo, FILTER_VALIDATE_URL) || 
+            str_starts_with($this->cover_photo, 'http://') || 
+            str_starts_with($this->cover_photo, 'https://')) {
             return $this->cover_photo;
         }
 
-        // Check if it starts with http:// or https://
-        if (str_starts_with($this->cover_photo, 'http://') || str_starts_with($this->cover_photo, 'https://')) {
-            return $this->cover_photo;
-        }
-
-        // It's a relative path, construct the URL
-        try {
-            return Storage::url('public/' . $this->cover_photo);
-        } catch (\Exception $e) {
-            // Fallback to asset helper
-            return asset('storage/' . $this->cover_photo);
-        }
+        // Otherwise, construct the URL properly
+        return Storage::url($this->cover_photo);
     }
 }
 
