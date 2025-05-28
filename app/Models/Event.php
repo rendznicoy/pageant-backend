@@ -102,4 +102,19 @@ class Event extends Model
     {
         return $date->format('Y-m-d\TH:i:s.u\Z');
     }
+
+    public function getCoverPhotoUrlAttribute()
+    {
+        if (!$this->cover_photo) {
+            return null;
+        }
+        
+        // If it's already a full URL, return as is
+        if (str_starts_with($this->cover_photo, 'http')) {
+            return $this->cover_photo;
+        }
+        
+        // If it's a relative path, build the proper URL
+        return url('storage/' . $this->cover_photo);
+    }
 }
