@@ -101,59 +101,78 @@ class JudgeController extends Controller
         return response()->json(new JudgeResource($judge), 200);
     }
 
-    public function update(UpdateJudgeRequest $request)
+    public function update(UpdateJudgeRequest $request, $event_id, $judge_id)
     {
-        $validated = $request->validated();
+        try {
+            Log::info('Judge update full request', $request->all());
 
-        $judge = Judge::where('judge_id', $validated['judge_id'])
-            ->where('event_id', $validated['event_id'])
-            ->firstOrFail();
+            $validated = $request->validated();
+            Log::info('Judge update validated', $validated);
 
-        $user = $judge->user;
-        $updated = false;
+            $judge = Judge::where('judge_id', $judge_id)
+                ->where('event_id', $event_id)
+                ->firstOrFail();
 
-        if ($user->first_name !== $validated['first_name']) {
-            $user->first_name = $validated['first_name'];
-            $updated = true;
-        }
-
-        if ($user->last_name !== $validated['last_name']) {
-            $user->last_name = $validated['last_name'];
-            $updated = true;
-        }
-
-        if ($user->email !== $validated['email']) {
-            $user->email = $validated['email'];
-            $updated = true;
-        }
-
-        // Handle Cloudinary photo upload
-        if ($request->hasFile('photo')) {
-            $file = $request->file('photo');
-            if ($file->isValid()) {
-                // Delete old image from Cloudinary
-                if ($user->profile_photo_public_id) {
-                    $this->cloudinaryService->delete($user->profile_photo_public_id);
-                }
-
-                // Upload new image
-                $uploadResult = $this->cloudinaryService->upload($file, 'profile_photos');
-                if ($uploadResult) {
-                    $user->profile_photo_url = $uploadResult['url'];
-                    $user->profile_photo_public_id = $uploadResult['public_id'];
-                    $updated = true;
-                }
+            // Update related user
+            $user = $judge->user;
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Associated user not found.',
+                ], 404);
             }
-        }
 
-        if ($updated) {
-            $user->save();
-        }
+            $updated = false;
 
-        return response()->json([
-            'message' => 'Judge updated successfully.',
-            'judge' => new JudgeResource($judge->fresh()),
-        ]);
+            // Update user fields
+            if (isset($validated['first_name']) && $user->first_name !== $validated['first_name']) {
+                $user->first_name = $validated['first_name'];
+                $updated = true;
+            }
+
+            if (isset($validated['last_name']) && $user->last_name !== $validated['last_name']) {
+                $user->last_name = $validated['last_name'];
+                $updated = true;
+            }
+
+            if (isset($validated['email']) && $user->email !== $validated['email']) {
+                $user->email = $validated['email'];
+                $updated = true;
+            }
+
+            // Handle new profile photo
+            if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
+                // Delete old photo if exists
+                if ($user->profile_photo && Storage::disk('public')->exists($user->profile_photo)) {
+                    Storage::disk('public')->delete($user->profile_photo);
+                }
+
+                $user->profile_photo = $request->file('photo')->store('uploads/profile_photos', 'public');
+                $updated = true;
+            }
+
+            if ($updated) {
+                $user->save();
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Judge updated successfully.',
+                'judge' => new JudgeResource($judge->fresh()),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Judge update failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request' => $request->all(),
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update judge: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function destroy(DestroyJudgeRequest $request)
