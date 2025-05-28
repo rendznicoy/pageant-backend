@@ -25,8 +25,8 @@ class JudgeResource extends JsonResource
             'last_name' => $this->user->last_name,
             'role' => $this->user->role,
             'profile_photo' => $this->user->profile_photo 
-                ? asset('storage/' . $this->user->profile_photo) 
-                : asset('uploads/profile_photos/default.png'),
+                ? secure_asset('storage/' . $this->user->profile_photo) 
+                : secure_asset('uploads/profile_photos/default.png'),
         ];
     }
 }
