@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use App\Models\Judge;
 use App\Models\Score;
-use Illuminate\Support\Facades\Log;
 
 class EventResource extends JsonResource
 {
@@ -68,37 +67,37 @@ class EventResource extends JsonResource
     }
 
     /**
-     * Get the proper cover photo URL - handles both Cloudinary and legacy storage
+     * Get the proper cover photo URL
      */
     private function getCoverPhotoUrl(): ?string
     {
-        // Debug logging
-        Log::info("Event {$this->event_id} debug:", [
-            'cover_photo' => $this->cover_photo,
-            'cover_photo_url' => $this->cover_photo_url ?? 'FIELD_NOT_FOUND',
-            'cover_photo_public_id' => $this->cover_photo_public_id ?? 'FIELD_NOT_FOUND',
-            'all_attributes' => array_keys($this->getAttributes()),
-        ]);
-
-        // Check if the field exists on the model
-        if (property_exists($this, 'cover_photo_url') && !empty($this->cover_photo_url)) {
-            return $this->cover_photo_url;
+        // Method 1: Try to access cover_photo_url directly
+        $cloudinaryUrl = $this->resource->cover_photo_url ?? null;
+        if (!empty($cloudinaryUrl)) {
+            return $cloudinaryUrl;
         }
 
-        // Fallback to direct attribute access
-        if (isset($this->attributes['cover_photo_url']) && !empty($this->attributes['cover_photo_url'])) {
-            return $this->attributes['cover_photo_url'];
+        // Method 2: Try accessing via attributes array
+        $attributes = $this->resource->getAttributes();
+        if (!empty($attributes['cover_photo_url'])) {
+            return $attributes['cover_photo_url'];
         }
 
-        // Handle legacy field
-        if (!empty($this->cover_photo)) {
-            if (str_contains($this->cover_photo, '/tmp/')) {
-                return null; // Skip temp files
+        // Method 3: Try the old cover_photo field
+        $coverPhoto = $this->resource->cover_photo ?? null;
+        if (!empty($coverPhoto)) {
+            // Skip temporary files
+            if (str_contains($coverPhoto, '/tmp/')) {
+                return null;
             }
-            if (str_starts_with($this->cover_photo, 'http')) {
-                return $this->cover_photo;
+
+            // If it's already a full URL, return as-is
+            if (str_starts_with($coverPhoto, 'http')) {
+                return $coverPhoto;
             }
-            return asset('storage/' . ltrim($this->cover_photo, '/'));
+
+            // Treat as local storage path
+            return asset('storage/' . ltrim($coverPhoto, '/'));
         }
 
         return null;
