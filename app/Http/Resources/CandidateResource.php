@@ -24,7 +24,7 @@ class CandidateResource extends JsonResource
             'last_name' => $this->last_name,
             'sex' => $this->sex,
             'team' => $this->team,
-            'photo' => $this->photo,
+            'photo' => $this->photo_url, // Use Cloudinary URL
             'is_active' => $this->is_active, // Add is_active
         ];
     }

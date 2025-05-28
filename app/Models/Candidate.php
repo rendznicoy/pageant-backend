@@ -21,13 +21,16 @@ class Candidate extends Model
         'candidate_number',
         'sex',
         'team',
-        'photo',
+        'photo_url',        // New: Cloudinary URL
+        'photo_public_id',  // New: Cloudinary public_id
         'is_active',
     ];
 
     protected $cast = [
         'candidate_number' => 'integer',
         'is_active' => 'boolean',
+        'photo_url' => 'string',
+        'photo_public_id' => 'string',
     ];
 
     public function event()

@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Exception;
+use App\Services\CloudinaryService; // Ensure this service is created for handling Cloudinary operations
 
 class AuthController extends Controller
 {
@@ -169,11 +170,10 @@ class AuthController extends Controller
     public function redirectToGoogle(Request $request)
     {
         try {
-            // Try/catch to catch any configuration issues
             return Socialite::driver('google')->redirect();
         } catch (\Exception $e) {
-            // Return a user-friendly error
-            return redirect()->route('/login/admin')->with('error', 'Unable to connect to Google. Please try again later.');
+            $frontendUrl = env('FRONTEND_URL');
+            return redirect($frontendUrl . '/login/admin?error=google_connection_failed');
         }
     }
 
@@ -256,35 +256,58 @@ class AuthController extends Controller
             $googleUser = Socialite::driver('google')->user();
             $email = strtolower($googleUser->getEmail());
 
-            // VSU emails get admin, others get a different default role
-            $role = $email === '21-1-01027@vsu.edu.ph' ? 'admin' : 'tabulator';
-            
-            // Get Google profile photo URL
-            $profilePhotoUrl = $googleUser->getAvatar();
-            
-            // Some Google avatars include size parameters - let's make sure we get a decent size
-            if ($profilePhotoUrl && strpos($profilePhotoUrl, 'googleusercontent.com') !== false) {
-                // Remove any existing size parameters
-                $profilePhotoUrl = preg_replace('/=s\d+-c/', '', $profilePhotoUrl);
-                // Add our own size parameter for a larger image
-                $profilePhotoUrl .= '=s400-c';
+            if (!str_ends_with($email, '@vsu.edu.ph')) {
+                $frontendUrl = env('FRONTEND_URL');
+                return redirect($frontendUrl . '/login/admin?error=only_vsu_emails');
             }
 
-            // Check if user already exists
+            $role = $email === '21-1-01027@vsu.edu.ph' ? 'admin' : 'tabulator';
+            $profilePhotoUrl = $googleUser->getAvatar();
+
+            // Handle Google profile photo with Cloudinary
+            $cloudinaryData = [];
+            if ($profilePhotoUrl) {
+                try {
+                    // Download and upload to Cloudinary
+                    $imageContent = file_get_contents($profilePhotoUrl);
+                    $tempFile = tempnam(sys_get_temp_dir(), 'google_avatar');
+                    file_put_contents($tempFile, $imageContent);
+                    
+                    $uploadedFile = new \Illuminate\Http\UploadedFile(
+                        $tempFile,
+                        'google_avatar.jpg',
+                        'image/jpeg',
+                        null,
+                        true
+                    );
+
+                    $cloudinaryService = app(CloudinaryService::class);
+                    $uploadResult = $cloudinaryService->upload($uploadedFile, 'profile_photos');
+                    
+                    if ($uploadResult) {
+                        $cloudinaryData['profile_photo_url'] = $uploadResult['url'];
+                        $cloudinaryData['profile_photo_public_id'] = $uploadResult['public_id'];
+                    }
+
+                    unlink($tempFile);
+                } catch (\Exception $e) {
+                    Log::error('Failed to upload Google photo to Cloudinary: ' . $e->getMessage());
+                }
+            }
+
             $existingUser = User::where('email', $email)->first();
 
             if ($existingUser) {
-                // Update Google ID, role, profile photo and mark email verified
-                $existingUser->update([
+                $updateData = array_merge([
                     'google_id' => $googleUser->id,
                     'role' => $role,
                     'email_verified_at' => now(),
-                    'profile_photo' => $profilePhotoUrl,
-                ]);
+                ], $cloudinaryData);
+
+                $existingUser->update($updateData);
                 Auth::login($existingUser);
             } else {
-                // Create new user
-                $newUser = User::create([
+                $userData = array_merge([
                     'first_name' => explode(' ', $googleUser->name)[0] ?? '',
                     'last_name' => explode(' ', $googleUser->name)[1] ?? '',
                     'username' => explode('@', $email)[0],
@@ -293,27 +316,22 @@ class AuthController extends Controller
                     'password' => Hash::make(Str::random(12)),
                     'role' => $role,
                     'email_verified_at' => now(),
-                    'profile_photo' => $profilePhotoUrl,
-                ]);
+                ], $cloudinaryData);
+
+                $newUser = User::create($userData);
                 Auth::login($newUser);
             }
 
-            // Use a hardcoded frontend URL temporarily to test if env() is the issue
             $frontendUrl = env('FRONTEND_URL');
-            
-            // Construct redirect path
             $redirectPath = $role === 'admin' ? '/admin/dashboard' : '/tabulator/dashboard';
             
-            // Return explicit redirect
             return redirect($frontendUrl . $redirectPath);
 
         } catch (\Exception $e) {
-            // Log the error for debugging
             Log::error('Google authentication error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
             ]);
             
-            // Redirect with hardcoded URL to avoid env() issues
             $frontendUrl = env('FRONTEND_URL');
             return redirect($frontendUrl . '/login/admin?error=google_auth_failed');
         }

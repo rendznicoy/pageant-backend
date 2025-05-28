@@ -20,6 +20,8 @@ return new class extends Migration
             $table->enum('sex', ['M', 'F']);
             $table->string('team');
             $table->binary('photo')->nullable(); // BLOB
+            $table->string('photo_url')->nullable();
+            $table->string('photo_public_id')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 

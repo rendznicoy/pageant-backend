@@ -19,6 +19,8 @@ return new class extends Migration
             $table->datetime('end_date')->nullable();
             $table->enum('status', ['inactive', 'active', 'completed'])->default('inactive');
             $table->string('cover_photo')->nullable();
+            $table->string('cover_photo_url')->nullable();
+            $table->string('cover_photo_public_id')->nullable();
             $table->text('description')->nullable();
             $table->enum('division', ['standard', 'male-only', 'female-only'])->default('standard');
             $table->integer('global_max_score')->default(100);

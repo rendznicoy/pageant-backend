@@ -23,9 +23,7 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'username' => $this->username,
             'role' => $this->role,
-            'profile_photo' => $this->profile_photo 
-                ? asset($this->profile_photo)  // This might also need fixing
-                : asset('uploads/profile_photos/default.png'),
+            'profile_photo' => $this->profile_photo_url ?: asset('uploads/profile_photos/default.png'),
         ];    
     }
 }

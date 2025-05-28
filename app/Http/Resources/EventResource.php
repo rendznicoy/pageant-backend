@@ -50,7 +50,7 @@ class EventResource extends JsonResource
                 : Carbon::parse($this->end_date)->toDateTimeString(),
             'status' => $this->status,
             'division' => $this->division,
-            'cover_photo' => $this->getCoverPhotoUrl(),
+            'cover_photo' => $this->cover_photo_url, // Use Cloudinary URL
             'description' => $this->description,
             'created_by' => $this->whenLoaded('createdBy', fn() => [
                 'user_id' => $this->createdBy?->user_id,
@@ -61,7 +61,7 @@ class EventResource extends JsonResource
             'judges_count' => $this->whenCounted('judges', fn() => $this->judges_count),
             'categories_count' => $this->whenCounted('categories', fn() => $this->categories_count),
             'active_categories_count' => $this->categories()->where('status', 'active')->count(),
-            'judges_with_pending_scores' => $pendingJudges ?? [],
+            'judges_with_pending_scores' => $pendingJudges,
             'statisticians' => $this->statisticians,
         ];
     }

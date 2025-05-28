@@ -26,6 +26,8 @@ return new class extends Migration
 
             $table->timestamp('email_verified_at')->nullable();
             $table->string('profile_photo')->nullable();
+            $table->string('profile_photo_url')->nullable();
+            $table->string('profile_photo_public_id')->nullable();
 
             $table->timestamps();
         });

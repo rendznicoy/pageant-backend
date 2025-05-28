@@ -12,9 +12,17 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use App\Services\CloudinaryService; // Ensure this service is created for handling Cloudinary operations
 
 class UserController extends Controller
 {
+    protected $cloudinaryService;
+
+    public function __construct(CloudinaryService $cloudinaryService)
+    {
+        $this->cloudinaryService = $cloudinaryService;
+    }
+
     public function index(Request $request)
     {
         $query = User::query();
@@ -35,6 +43,18 @@ class UserController extends Controller
     {
         $data = $request->validated();
         $data['password'] = bcrypt($data['password']);
+
+        // Handle Cloudinary profile photo upload
+        if ($request->hasFile('profile_photo')) {
+            $file = $request->file('profile_photo');
+            if ($file->isValid()) {
+                $uploadResult = $this->cloudinaryService->upload($file, 'profile_photos');
+                if ($uploadResult) {
+                    $data['profile_photo_url'] = $uploadResult['url'];
+                    $data['profile_photo_public_id'] = $uploadResult['public_id'];
+                }
+            }
+        }
 
         $user = User::create($data);
 
@@ -77,6 +97,24 @@ class UserController extends Controller
             $validatedData['password'] = bcrypt($validatedData['password']);
         }
 
+        // Handle Cloudinary profile photo upload
+        if ($request->hasFile('profile_photo')) {
+            $file = $request->file('profile_photo');
+            if ($file->isValid()) {
+                // Delete old image from Cloudinary
+                if ($user->profile_photo_public_id) {
+                    $this->cloudinaryService->delete($user->profile_photo_public_id);
+                }
+
+                // Upload new image
+                $uploadResult = $this->cloudinaryService->upload($file, 'profile_photos');
+                if ($uploadResult) {
+                    $validatedData['profile_photo_url'] = $uploadResult['url'];
+                    $validatedData['profile_photo_public_id'] = $uploadResult['public_id'];
+                }
+            }
+        }
+
         $user->update($validatedData);
 
         return response()->json([
@@ -97,6 +135,11 @@ class UserController extends Controller
             return response()->json(['message' => 'User has associated events or judge profile'], 422);
         }
 
+        // Delete profile photo from Cloudinary
+        if ($user->profile_photo_public_id) {
+            $this->cloudinaryService->delete($user->profile_photo_public_id);
+        }
+
         $user->delete();
 
         return response()->json(['message' => 'User deleted successfully.'], 204);
@@ -112,11 +155,25 @@ class UserController extends Controller
             'profile_photo' => 'nullable|image|max:2048',
         ]);
 
+        // Handle Cloudinary profile photo upload
         if ($request->hasFile('profile_photo')) {
-            $data['profile_photo'] = $request->file('profile_photo')->store('profile_photos', 'public');
+            $file = $request->file('profile_photo');
+            if ($file->isValid()) {
+                // Delete old image from Cloudinary
+                if ($user->profile_photo_public_id) {
+                    $this->cloudinaryService->delete($user->profile_photo_public_id);
+                }
+
+                // Upload new image
+                $uploadResult = $this->cloudinaryService->upload($file, 'profile_photos');
+                if ($uploadResult) {
+                    $data['profile_photo_url'] = $uploadResult['url'];
+                    $data['profile_photo_public_id'] = $uploadResult['public_id'];
+                }
+            }
         }
 
-        $user = User::find($user->user_id); // Refresh instance
+        $user = User::find($user->user_id);
         $user->update($data);
 
         return response()->json([
@@ -148,6 +205,12 @@ class UserController extends Controller
                     $failed[] = ['id' => $user_id, 'message' => 'User has associated events or judge profile'];
                     continue;
                 }
+
+                // Delete profile photo from Cloudinary
+                if ($user->profile_photo_public_id) {
+                    $this->cloudinaryService->delete($user->profile_photo_public_id);
+                }
+
                 $user->delete();
                 $success[] = $user_id;
             } catch (\Exception $e) {
@@ -166,7 +229,7 @@ class UserController extends Controller
         ]);
     }
 
-    protected function proxyGoogleProfilePhoto($googleUrl)
+    /* protected function proxyGoogleProfilePhoto($googleUrl)
     {
         try {
             $hash = md5($googleUrl);
@@ -191,5 +254,5 @@ class UserController extends Controller
             Log::error('Failed to proxy Google profile photo: ' . $e->getMessage());
             return null;
         }
-    }
+    } */
 }

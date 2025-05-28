@@ -13,9 +13,17 @@ use App\Models\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use App\Services\CloudinaryService;
 
 class CandidateController extends Controller
 {
+    protected $cloudinaryService;
+
+    public function __construct(CloudinaryService $cloudinaryService)
+    {
+        $this->cloudinaryService = $cloudinaryService;
+    }
+
     public function index(Request $request, $event_id) {
         $query = Candidate::where('event_id', $event_id);
         if ($request->has('sex')) {
@@ -37,12 +45,12 @@ class CandidateController extends Controller
         $event = Event::findOrFail($request->event_id);
 
         if ($event->division === 'male-only') {
-            $request->merge(['sex' => 'M']);
+            $validated['sex'] = 'M';
         } elseif ($event->division === 'female-only') {
-            $request->merge(['sex' => 'F']);
+            $validated['sex'] = 'F';
         }
 
-        $exists = Candidate::where('event_id', $event->id)
+        $exists = Candidate::where('event_id', $event->event_id)
             ->where('candidate_number', $request->candidate_number)
             ->exists();
 
@@ -50,12 +58,17 @@ class CandidateController extends Controller
             return response()->json(['message' => 'Candidate number must be unique.'], 422);
         }
 
+        // Handle Cloudinary photo upload
         if ($request->hasFile('photo')) {
             $file = $request->file('photo');
             if ($file->isValid()) {
-                $validated['photo'] = $file->store('candidate_photos', 'public');
+                $uploadResult = $this->cloudinaryService->upload($file, 'candidate_photos');
+                if ($uploadResult) {
+                    $validated['photo_url'] = $uploadResult['url'];
+                    $validated['photo_public_id'] = $uploadResult['public_id'];
+                }
             }
-        }               
+        }
 
         $candidate = Candidate::create($validated);
 
@@ -64,6 +77,7 @@ class CandidateController extends Controller
             'data' => new CandidateResource($candidate),
         ], 201);
     }
+
 
     public function show(ShowCandidateRequest $request) 
     {
@@ -78,15 +92,13 @@ class CandidateController extends Controller
 
     public function update(UpdateCandidateRequest $request)
     {
-        Log::info('Raw update request payload', $request->all());
-
         $candidate = Candidate::where('candidate_id', $request->candidate_id)
             ->where('event_id', $request->event_id)
             ->firstOrFail();
 
         $updated = false;
 
-        // Safely update fields only if changed
+        // Update regular fields
         $fields = ['first_name', 'last_name', 'candidate_number', 'sex', 'team'];
         foreach ($fields as $field) {
             $newValue = $request->input($field);
@@ -94,10 +106,9 @@ class CandidateController extends Controller
                 $candidate->$field = $newValue;
                 $updated = true;
             }
-            Log::info("Updating field $field: '{$candidate->$field}' → '$newValue'");
         }
 
-        // Handle is_active as boolean (safely compare)
+        // Handle is_active as boolean
         if ($request->has('is_active')) {
             $newIsActive = filter_var($request->input('is_active'), FILTER_VALIDATE_BOOLEAN);
             if ($candidate->is_active !== $newIsActive) {
@@ -106,15 +117,23 @@ class CandidateController extends Controller
             }
         }
 
-        // Handle photo upload
-        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
-            if ($candidate->photo && Storage::disk('public')->exists($candidate->photo)) {
-                Storage::disk('public')->delete($candidate->photo);
-            }
+        // Handle Cloudinary photo upload
+        if ($request->hasFile('photo')) {
+            $file = $request->file('photo');
+            if ($file->isValid()) {
+                // Delete old image from Cloudinary
+                if ($candidate->photo_public_id) {
+                    $this->cloudinaryService->delete($candidate->photo_public_id);
+                }
 
-            $path = $request->file('photo')->store('candidate_photos', 'public');
-            $candidate->photo = $path;
-            $updated = true;
+                // Upload new image
+                $uploadResult = $this->cloudinaryService->upload($file, 'candidate_photos');
+                if ($uploadResult) {
+                    $candidate->photo_url = $uploadResult['url'];
+                    $candidate->photo_public_id = $uploadResult['public_id'];
+                    $updated = true;
+                }
+            }
         }
 
         if (!$updated) {
@@ -140,6 +159,11 @@ class CandidateController extends Controller
             ->where('event_id', $validated['event_id'])
             ->firstOrFail();
 
+        // Delete photo from Cloudinary
+        if ($candidate->photo_public_id) {
+            $this->cloudinaryService->delete($candidate->photo_public_id);
+        }
+
         $candidate->delete();
 
         return response()->json(['message' => 'Candidate deleted successfully.'], 204);
@@ -147,7 +171,17 @@ class CandidateController extends Controller
 
     public function resetCandidates($id)
     {
+        $candidates = Candidate::where('event_id', $id)->get();
+        
+        // Delete all candidate photos from Cloudinary
+        foreach ($candidates as $candidate) {
+            if ($candidate->photo_public_id) {
+                $this->cloudinaryService->delete($candidate->photo_public_id);
+            }
+        }
+
         Candidate::where('event_id', $id)->delete();
+        
         return response()->json(['message' => 'Candidates reset successfully']);
     }
 }

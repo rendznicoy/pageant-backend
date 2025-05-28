@@ -18,7 +18,8 @@ class User extends Authenticatable
         'password',
         'role',
         'email_verified_at',
-        'profile_photo', // Added profile_photo to fillable
+        'profile_photo_url',      // New: Cloudinary URL
+        'profile_photo_public_id', // New: Cloudinary public_id
     ];
     protected $attributes = [
         'role' => 'judge',
@@ -30,6 +31,8 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'profile_photo_url' => 'string',
+        'profile_photo_public_id' => 'string',
     ];
     public function events()
     {

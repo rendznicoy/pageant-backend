@@ -22,9 +22,17 @@ use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use App\Models\Score;
 use App\Models\Candidate;
+use App\Services\CloudinaryService;
 
 class EventController extends Controller
 {
+    protected $cloudinaryService;
+
+    public function __construct(CloudinaryService $cloudinaryService)
+    {
+        $this->cloudinaryService = $cloudinaryService;
+    }
+
     public function index()
     {
         try {
@@ -46,13 +54,17 @@ class EventController extends Controller
         try {
             $validated = $request->validated();
 
+            // Handle Cloudinary upload
             if ($request->hasFile('cover_photo')) {
                 $file = $request->file('cover_photo');
                 if ($file->isValid()) {
-                    $path = $file->store('event_covers', 'public');
-                    $validated['cover_photo'] = $path;
-                } else {
-                    throw new \Exception('Invalid file upload');
+                    $uploadResult = $this->cloudinaryService->upload($file, 'event_covers');
+                    if ($uploadResult) {
+                        $validated['cover_photo_url'] = $uploadResult['url'];
+                        $validated['cover_photo_public_id'] = $uploadResult['public_id'];
+                    } else {
+                        throw new \Exception('Failed to upload image to Cloudinary');
+                    }
                 }
             }
 
@@ -122,6 +134,7 @@ class EventController extends Controller
             $updateData = [];
             $fields = ['event_name', 'venue', 'description', 'start_date', 'end_date', 'division'];
 
+            // Handle regular fields
             foreach ($fields as $field) {
                 if (in_array($field, ['start_date', 'end_date']) && isset($validated[$field])) {
                     $submitted = Carbon::parse($validated[$field])->utc()->format('Y-m-d H:i:s');
@@ -141,31 +154,27 @@ class EventController extends Controller
                 }
             }
 
-            // Compare cover photo
+            // Handle Cloudinary image upload
             if ($request->hasFile('cover_photo')) {
                 $file = $request->file('cover_photo');
                 if ($file->isValid()) {
-                    $newName = $file->getClientOriginalName();
-                    $oldName = $event->cover_photo ? basename($event->cover_photo) : '';
-                    if ($newName !== $oldName) {
-                        if ($event->cover_photo) {
-                            Storage::disk('public')->delete($event->cover_photo);
-                        }
-                        $path = $file->store('event_covers', 'public');
-                        $updateData['cover_photo'] = $path;
+                    // Delete old image from Cloudinary
+                    if ($event->cover_photo_public_id) {
+                        $this->cloudinaryService->delete($event->cover_photo_public_id);
+                    }
+
+                    // Upload new image
+                    $uploadResult = $this->cloudinaryService->upload($file, 'event_covers');
+                    if ($uploadResult) {
+                        $updateData['cover_photo_url'] = $uploadResult['url'];
+                        $updateData['cover_photo_public_id'] = $uploadResult['public_id'];
                     }
                 }
             }
 
             // Handle statisticians change
-            $hasChangedStatisticians = false;
-            if ($request->has('statisticians')) {
-                $incomingStats = $request->input('statisticians');
-                if ($incomingStats !== $event->statisticians) {
-                    $event->statisticians = $incomingStats;
-                    $hasChangedStatisticians = true;
-                }
-            }
+            $incomingStats = $request->input('statisticians');
+            $hasChangedStatisticians = $incomingStats !== $event->statisticians;
 
             // Save changes
             if (empty($updateData) && !$hasChangedStatisticians) {
@@ -189,6 +198,7 @@ class EventController extends Controller
                 'message' => 'Event updated successfully.',
                 'event' => new EventResource($event->fresh()),
             ]);
+
         } catch (\Exception $e) {
             Log::error('Event update failed', [
                 'message' => $e->getMessage(),
@@ -207,8 +217,9 @@ class EventController extends Controller
             $validated = $request->validated();
             $event = Event::where('event_id', $validated['event_id'])->firstOrFail();
 
-            if ($event->cover_photo) {
-                Storage::disk('public')->delete($event->cover_photo);
+            // Delete image from Cloudinary
+            if ($event->cover_photo_public_id) {
+                $this->cloudinaryService->delete($event->cover_photo_public_id);
             }
 
             $event->delete();

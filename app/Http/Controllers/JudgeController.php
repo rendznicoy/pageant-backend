@@ -17,9 +17,17 @@ use App\Models\Score;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use App\Services\CloudinaryService;
 
 class JudgeController extends Controller
 {
+    protected $cloudinaryService;
+
+    public function __construct(CloudinaryService $cloudinaryService)
+    {
+        $this->cloudinaryService = $cloudinaryService;
+    }
+
     public function index($event_id)
     {
         $judges = Judge::with('user')->where('event_id', $event_id)->get();
@@ -35,26 +43,35 @@ class JudgeController extends Controller
             return response()->json(['message' => 'Event not found.'], 404);
         }
 
-        $username = strtolower(explode('@', $request->first_name)[0]);
+        $username = strtolower(explode('@', $request->email)[0]);
         $originalUsername = $username;
         $counter = 1;
         while (User::where('username', $username)->exists()) {
             $username = $originalUsername . $counter++;
         }
 
-        $photoPath = null;
-        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
-            $photoPath = $request->file('photo')->store('uploads/profile_photos', 'public');
-        }
-
-        $user = User::create([
+        $userData = [
             'username' => $username,
+            'email' => $request->email,
             'first_name' => $request->first_name,
             'last_name' => $request->last_name,
             'role' => 'judge',
             'password' => null,
-            'profile_photo' => $photoPath, // save path to DB
-        ]);
+        ];
+
+        // Handle Cloudinary photo upload
+        if ($request->hasFile('photo')) {
+            $file = $request->file('photo');
+            if ($file->isValid()) {
+                $uploadResult = $this->cloudinaryService->upload($file, 'profile_photos');
+                if ($uploadResult) {
+                    $userData['profile_photo_url'] = $uploadResult['url'];
+                    $userData['profile_photo_public_id'] = $uploadResult['public_id'];
+                }
+            }
+        }
+
+        $user = User::create($userData);
 
         do {
             $pin = strtoupper(Str::random(6));
@@ -86,19 +103,13 @@ class JudgeController extends Controller
 
     public function update(UpdateJudgeRequest $request)
     {
-        Log::info('Judge update full request', $request->all());
-
         $validated = $request->validated();
-
-        Log::info('Judge update validated', $validated);
 
         $judge = Judge::where('judge_id', $validated['judge_id'])
             ->where('event_id', $validated['event_id'])
             ->firstOrFail();
 
-        // Update related user
         $user = $judge->user;
-
         $updated = false;
 
         if ($user->first_name !== $validated['first_name']) {
@@ -111,15 +122,28 @@ class JudgeController extends Controller
             $updated = true;
         }
 
-        // Handle new profile photo
-        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
-            // Delete old if exists
-            if ($user->profile_photo && Storage::disk('public')->exists($user->profile_photo)) {
-                Storage::disk('public')->delete($user->profile_photo);
-            }
-
-            $user->profile_photo = $request->file('photo')->store('uploads/profile_photos', 'public');
+        if ($user->email !== $validated['email']) {
+            $user->email = $validated['email'];
             $updated = true;
+        }
+
+        // Handle Cloudinary photo upload
+        if ($request->hasFile('photo')) {
+            $file = $request->file('photo');
+            if ($file->isValid()) {
+                // Delete old image from Cloudinary
+                if ($user->profile_photo_public_id) {
+                    $this->cloudinaryService->delete($user->profile_photo_public_id);
+                }
+
+                // Upload new image
+                $uploadResult = $this->cloudinaryService->upload($file, 'profile_photos');
+                if ($uploadResult) {
+                    $user->profile_photo_url = $uploadResult['url'];
+                    $user->profile_photo_public_id = $uploadResult['public_id'];
+                    $updated = true;
+                }
+            }
         }
 
         if ($updated) {
@@ -140,12 +164,15 @@ class JudgeController extends Controller
             ->where('event_id', $validated['event_id'])
             ->firstOrFail();
 
-        $user = $judge->user; // Fetch related user
+        $user = $judge->user;
 
-        // Delete the judge first
+        // Delete profile photo from Cloudinary
+        if ($user && $user->profile_photo_public_id) {
+            $this->cloudinaryService->delete($user->profile_photo_public_id);
+        }
+
         $judge->delete();
 
-        // Then delete the user (if you really want full cleanup)
         if ($user) {
             $user->delete();
         }
