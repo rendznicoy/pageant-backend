@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class UserResource extends JsonResource
 {
@@ -24,8 +25,8 @@ class UserResource extends JsonResource
             'username' => $this->username,
             'role' => $this->role,
             'profile_photo' => $this->profile_photo 
-                ? secure_url($this->profile_photo) // Use secure_url
-                : secure_url('uploads/profile_photos/default.png'),
+                ? Storage::url($this->profile_photo)
+                : asset('uploads/profile_photos/default.png'),
         ];    
     }
 }

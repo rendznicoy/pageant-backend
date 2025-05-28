@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class JudgeResource extends JsonResource
 {
@@ -25,8 +26,8 @@ class JudgeResource extends JsonResource
             'last_name' => $this->user->last_name,
             'role' => $this->user->role,
             'profile_photo' => $this->user->profile_photo 
-                ? secure_url('storage/' . $this->user->profile_photo) 
-                : secure_url('uploads/profile_photos/default.png'),
+                ? Storage::url($this->user->profile_photo)
+                : asset('uploads/profile_photos/default.png'),
         ];
     }
 }
