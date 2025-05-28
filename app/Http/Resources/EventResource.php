@@ -49,7 +49,7 @@ class EventResource extends JsonResource
                 : Carbon::parse($this->end_date)->toDateTimeString(),
             'status' => $this->status,
             'division' => $this->division,
-            'cover_photo' => $this->cover_photo ? Storage::url($this->cover_photo) : null,
+            'cover_photo' => $this->getCoverPhotoUrl(),
             'description' => $this->description,
             'created_by' => $this->whenLoaded('createdBy', fn() => [
                 'user_id' => $this->createdBy?->user_id,
@@ -71,12 +71,12 @@ class EventResource extends JsonResource
             return null;
         }
         
-        // Always return the full production URL regardless of request origin
-        $baseUrl = config('app.url');
+        // Check if it's already a full URL
+        if (filter_var($this->cover_photo, FILTER_VALIDATE_URL)) {
+            return $this->cover_photo;
+        }
         
-        // Make sure baseUrl doesn't end with slash
-        $baseUrl = rtrim($baseUrl, '/');
-        
-        return $baseUrl . '/storage/' . $this->cover_photo;
+        // If it's a relative path, generate the URL
+        return Storage::url($this->cover_photo);
     }
 }
