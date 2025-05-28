@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use App\Models\Judge;
 use App\Models\Score;
+use Illuminate\Support\Facades\Log;
 
 class EventResource extends JsonResource
 {
@@ -71,19 +72,26 @@ class EventResource extends JsonResource
      */
     private function getCoverPhotoUrl(): ?string
     {
-        // New Cloudinary field takes priority
+        // Debug: Log the actual values
+        Log::info("Event {$this->event_id} image fields:", [
+            'cover_photo' => $this->cover_photo,
+            'cover_photo_url' => $this->cover_photo_url,
+            'cover_photo_public_id' => $this->cover_photo_public_id,
+        ]);
+
+        // Priority 1: New Cloudinary URL field
         if (!empty($this->cover_photo_url)) {
             return $this->cover_photo_url;
         }
 
-        // For legacy cover_photo field
+        // Priority 2: Legacy cover_photo field
         if (!empty($this->cover_photo)) {
-            // If it contains /tmp/, it's a temporary file - ignore it
+            // Skip temporary files
             if (str_contains($this->cover_photo, '/tmp/')) {
                 return null;
             }
 
-            // If it's already a complete URL, return as-is
+            // If it's already a full URL, return as-is
             if (str_starts_with($this->cover_photo, 'http')) {
                 return $this->cover_photo;
             }
