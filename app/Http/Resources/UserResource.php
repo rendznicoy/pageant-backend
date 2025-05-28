@@ -24,8 +24,8 @@ class UserResource extends JsonResource
             'username' => $this->username,
             'role' => $this->role,
             'profile_photo' => $this->profile_photo 
-                ? secure_asset($this->profile_photo) // Use secure_asset instead of asset
-                : secure_asset('uploads/profile_photos/default.png'),
-        ];
+                ? secure_url($this->profile_photo) // Use secure_url
+                : secure_url('uploads/profile_photos/default.png'),
+        ];    
     }
 }

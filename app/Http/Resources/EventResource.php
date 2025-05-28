@@ -49,9 +49,10 @@ class EventResource extends JsonResource
                 : Carbon::parse($this->end_date)->toDateTimeString(),
             'status' => $this->status,
             'division' => $this->division,
-            'cover_photo' => $this->cover_photo ? Storage::url('public/' . $this->cover_photo) : null,
+            'cover_photo' => $this->cover_photo 
+                ? secure_url('storage/' . $this->cover_photo) // Use secure_url instead of Storage::url
+                : null,
             'description' => $this->description,
-            'global_max_score' => $this->global_max_score ?? 100,
             'created_by' => $this->whenLoaded('createdBy', fn() => [
                 'user_id' => $this->createdBy?->user_id,
                 'first_name' => $this->createdBy?->first_name,
@@ -65,4 +66,4 @@ class EventResource extends JsonResource
             'statisticians' => $this->statisticians,
         ];
     }
-    }
+}
