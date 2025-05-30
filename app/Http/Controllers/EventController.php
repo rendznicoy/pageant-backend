@@ -444,7 +444,7 @@ class EventController extends Controller
         try {
             $event = Event::findOrFail($event_id);
             
-            $oldMaxScore = $event->global_max_score ?? 100;
+            $oldMaxScore = $event->global_max_score ?? 10;
             $newMaxScore = $request->global_max_score;
             
             // Update the event's global max score
@@ -453,6 +453,13 @@ class EventController extends Controller
             // Update all categories in this event to use the new max score
             Category::where('event_id', $event_id)
                 ->update(['max_score' => $newMaxScore]);
+            
+            Log::info('Global max score updated', [
+                'event_id' => $event_id,
+                'old_score' => $oldMaxScore,
+                'new_score' => $newMaxScore,
+                'categories_updated' => Category::where('event_id', $event_id)->count()
+            ]);
             
             return response()->json([
                 'message' => 'Global max score updated successfully.',

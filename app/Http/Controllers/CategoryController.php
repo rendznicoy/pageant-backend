@@ -33,14 +33,14 @@ class CategoryController extends Controller
     {
         $validated = $request->validated();
         
-        // Get the global max score from the event
+        // Always use the event's global max score
         $event = Event::findOrFail($validated['event_id']);
-        $globalMaxScore = $event->global_max_score ?? 10;
+        $globalMaxScore = $event->global_max_score ?? 100;
         
         $category = Category::create(array_merge($validated, [
             'status' => 'pending',
             'current_candidate_id' => null,
-            'max_score' => $globalMaxScore, // ✅ Use global max score
+            'max_score' => $globalMaxScore, // ✅ Always use global
         ]));
 
         return response()->json([
@@ -72,16 +72,19 @@ class CategoryController extends Controller
                 ->where('event_id', $validated['event_id'])
                 ->firstOrFail();
 
-            // Get the event's global max score and ensure category uses it
+            // Always use the event's global max score - don't allow individual category max_score updates
             $event = Event::findOrFail($validated['event_id']);
             $globalMaxScore = $event->global_max_score ?? 100;
+            
+            // Remove max_score from validated data and force global value
+            unset($validated['max_score']);
             $validated['max_score'] = $globalMaxScore;
-
+            
             $category->update($validated);
 
             return response()->json([
                 'message' => 'Category updated successfully.',
-                'category' => new CategoryResource($category),
+                'category' => new CategoryResource($category->load('event')),
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error('Validation Error', ['errors' => $e->errors()]);

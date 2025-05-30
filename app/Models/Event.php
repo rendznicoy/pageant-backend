@@ -32,7 +32,7 @@ class Event extends Model
 
     protected $attributes = [
         'status' => 'inactive',
-        'global_max_score' => 100,
+        'global_max_score' => 100, // ✅ Back to 100 as intended
     ];
 
     protected $casts = [
