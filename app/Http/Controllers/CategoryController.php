@@ -23,7 +23,9 @@ class CategoryController extends Controller
 {
     public function index(Request $request, $event_id)
     {
-        $categories = Category::where('event_id', $event_id)->with('stage')->get();
+        $categories = Category::where('event_id', $event_id)
+            ->with(['stage', 'event']) // ✅ Load event relationship
+            ->get();
         return response()->json(CategoryResource::collection($categories));
     }
 
@@ -31,19 +33,19 @@ class CategoryController extends Controller
     {
         $validated = $request->validated();
         
-        // Get the event's global max score
+        // Get the global max score from the event
         $event = Event::findOrFail($validated['event_id']);
-        $globalMaxScore = $event->global_max_score ?? 100;
+        $globalMaxScore = $event->global_max_score ?? 10;
         
         $category = Category::create(array_merge($validated, [
             'status' => 'pending',
             'current_candidate_id' => null,
-            'max_score' => $globalMaxScore, // Use global max score
+            'max_score' => $globalMaxScore, // ✅ Use global max score
         ]));
 
         return response()->json([
             'message' => 'Category created successfully.',
-            'data' => new CategoryResource($category),
+            'data' => new CategoryResource($category->load('event')),
         ], 201);
     }
 

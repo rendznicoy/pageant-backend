@@ -26,7 +26,6 @@ class Category extends Model
     protected $attributes = [
         'status' => 'pending',
         'category_weight' => 100,
-        'max_score' => 100,
     ];
 
     protected $casts = [
