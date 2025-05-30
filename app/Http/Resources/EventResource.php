@@ -52,6 +52,7 @@ class EventResource extends JsonResource
             'division' => $this->division,
             'cover_photo' => $this->getCoverPhotoUrl(),
             'description' => $this->description,
+            'global_max_score' => $this->global_max_score ?? 100, // ✅ Add this line
             'created_by' => $this->whenLoaded('createdBy', fn() => [
                 'user_id' => $this->createdBy?->user_id,
                 'first_name' => $this->createdBy?->first_name,

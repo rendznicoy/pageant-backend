@@ -437,6 +437,12 @@ class EventController extends Controller
 
     public function updateGlobalMaxScore(Request $request, $event_id)
     {
+        Log::info('updateGlobalMaxScore called', [
+            'event_id' => $event_id,
+            'request_data' => $request->all(),
+            'headers' => $request->headers->all()
+        ]);
+
         $request->validate([
             'global_max_score' => 'required|integer|min:1|max:100'
         ]);
@@ -444,35 +450,61 @@ class EventController extends Controller
         try {
             $event = Event::findOrFail($event_id);
             
-            $oldMaxScore = $event->global_max_score ?? 10;
+            Log::info('Event found', [
+                'event_id' => $event->event_id,
+                'current_global_max_score' => $event->global_max_score,
+                'new_global_max_score' => $request->global_max_score
+            ]);
+            
+            $oldMaxScore = $event->global_max_score ?? 100;
             $newMaxScore = $request->global_max_score;
             
             // Update the event's global max score
-            $event->update(['global_max_score' => $newMaxScore]);
+            $updateResult = $event->update(['global_max_score' => $newMaxScore]);
+            
+            Log::info('Event update result', [
+                'update_result' => $updateResult,
+                'event_after_update' => $event->fresh()->global_max_score
+            ]);
             
             // Update all categories in this event to use the new max score
-            Category::where('event_id', $event_id)
+            $categoryUpdateCount = Category::where('event_id', $event_id)
                 ->update(['max_score' => $newMaxScore]);
             
-            Log::info('Global max score updated', [
+            Log::info('Categories updated', [
                 'event_id' => $event_id,
-                'old_score' => $oldMaxScore,
-                'new_score' => $newMaxScore,
-                'categories_updated' => Category::where('event_id', $event_id)->count()
+                'categories_updated_count' => $categoryUpdateCount,
+                'new_max_score' => $newMaxScore
+            ]);
+            
+            // Verify the update worked
+            $verifyEvent = Event::find($event_id);
+            $verifyCategories = Category::where('event_id', $event_id)->get(['category_id', 'max_score']);
+            
+            Log::info('Verification', [
+                'event_global_max_score_after' => $verifyEvent->global_max_score,
+                'categories_max_scores' => $verifyCategories->pluck('max_score')->toArray()
             ]);
             
             return response()->json([
                 'message' => 'Global max score updated successfully.',
-                'global_max_score' => $newMaxScore
+                'global_max_score' => $newMaxScore,
+                'categories_updated' => $categoryUpdateCount,
+                'debug' => [
+                    'old_score' => $oldMaxScore,
+                    'new_score' => $newMaxScore,
+                    'verification' => $verifyEvent->global_max_score
+                ]
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to update global max score', [
                 'event_id' => $event_id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             
             return response()->json([
-                'message' => 'Failed to update global max score'
+                'message' => 'Failed to update global max score: ' . $e->getMessage()
             ], 500);
         }
     }
