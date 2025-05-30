@@ -437,46 +437,35 @@ class EventController extends Controller
 
     public function updateGlobalMaxScore(Request $request, $event_id)
     {
+        $request->validate([
+            'global_max_score' => 'required|integer|min:1|max:100'
+        ]);
+
         try {
-            $request->validate([
-                'global_max_score' => 'required|integer|min:1|max:100',
-            ]);
-
             $event = Event::findOrFail($event_id);
-
-            // Check if event is locked
-            if (in_array($event->status, ['active', 'completed'])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cannot update max score when event is active or completed.',
-                ], 400);
-            }
-
-            $newMaxScore = $request->input('global_max_score');
             
-            // Update event's global max score
+            $oldMaxScore = $event->global_max_score ?? 100;
+            $newMaxScore = $request->global_max_score;
+            
+            // Update the event's global max score
             $event->update(['global_max_score' => $newMaxScore]);
-
-            // Update all existing categories to use the new max score
+            
+            // Update all categories in this event to use the new max score
             Category::where('event_id', $event_id)
                 ->update(['max_score' => $newMaxScore]);
-
+            
             return response()->json([
-                'success' => true,
                 'message' => 'Global max score updated successfully.',
-                'global_max_score' => $newMaxScore,
+                'global_max_score' => $newMaxScore
             ]);
-
         } catch (\Exception $e) {
-            Log::error('Global max score update failed', [
+            Log::error('Failed to update global max score', [
                 'event_id' => $event_id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'error' => $e->getMessage()
             ]);
             
             return response()->json([
-                'success' => false,
-                'message' => 'Failed to update global max score: ' . $e->getMessage(),
+                'message' => 'Failed to update global max score'
             ], 500);
         }
     }
