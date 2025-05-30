@@ -42,7 +42,7 @@ class CandidateController extends Controller
     {
         try {
             $validated = $request->validated();
-            $validated['event_id'] = $event_id; // Set from route parameter
+            $validated['event_id'] = $event_id;
 
             $event = Event::findOrFail($event_id);
 
@@ -53,13 +53,31 @@ class CandidateController extends Controller
                 $validated['sex'] = 'F';
             }
 
-            // Check for unique candidate number
-            $exists = Candidate::where('event_id', $event_id)
-                ->where('candidate_number', $validated['candidate_number'])
-                ->exists();
+            // Division-specific candidate number uniqueness check
+            if ($event->division === 'standard') {
+                // For standard division: check uniqueness by event_id + candidate_number + sex
+                // This allows male and female to have the same candidate number (pairs)
+                $exists = Candidate::where('event_id', $event_id)
+                    ->where('candidate_number', $validated['candidate_number'])
+                    ->where('sex', $validated['sex'])
+                    ->exists();
+            } else {
+                // For male-only and female-only: check uniqueness by event_id + candidate_number only
+                $exists = Candidate::where('event_id', $event_id)
+                    ->where('candidate_number', $validated['candidate_number'])
+                    ->exists();
+            }
 
             if ($exists) {
-                return response()->json(['message' => 'Candidate number must be unique.'], 422);
+                if ($event->division === 'standard') {
+                    return response()->json([
+                        'message' => 'A candidate with this number and sex already exists.'
+                    ], 422);
+                } else {
+                    return response()->json([
+                        'message' => 'Candidate number must be unique.'
+                    ], 422);
+                }
             }
 
             // Handle Cloudinary photo upload
@@ -74,7 +92,6 @@ class CandidateController extends Controller
                 }
             }
 
-            // Set default is_active to true
             $validated['is_active'] = $validated['is_active'] ?? true;
 
             $candidate = Candidate::create($validated);
@@ -116,7 +133,38 @@ class CandidateController extends Controller
                 ->where('event_id', $event_id)
                 ->firstOrFail();
 
+            $event = Event::findOrFail($event_id);
             $updated = false;
+
+            // Check candidate number uniqueness if it's being changed
+            if (isset($validated['candidate_number']) && $candidate->candidate_number !== $validated['candidate_number']) {
+                if ($event->division === 'standard') {
+                    // For standard division: check uniqueness by event_id + candidate_number + sex
+                    $exists = Candidate::where('event_id', $event_id)
+                        ->where('candidate_number', $validated['candidate_number'])
+                        ->where('sex', $validated['sex'] ?? $candidate->sex)
+                        ->where('candidate_id', '!=', $candidate_id)
+                        ->exists();
+                } else {
+                    // For male-only and female-only: check uniqueness by event_id + candidate_number only
+                    $exists = Candidate::where('event_id', $event_id)
+                        ->where('candidate_number', $validated['candidate_number'])
+                        ->where('candidate_id', '!=', $candidate_id)
+                        ->exists();
+                }
+
+                if ($exists) {
+                    if ($event->division === 'standard') {
+                        return response()->json([
+                            'message' => 'A candidate with this number and sex already exists.'
+                        ], 422);
+                    } else {
+                        return response()->json([
+                            'message' => 'Candidate number must be unique.'
+                        ], 422);
+                    }
+                }
+            }
 
             // Update regular fields
             $fields = ['first_name', 'last_name', 'candidate_number', 'sex', 'team'];
