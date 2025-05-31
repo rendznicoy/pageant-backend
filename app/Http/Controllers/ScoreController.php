@@ -429,29 +429,9 @@ class ScoreController extends Controller
 
     public function finalResults($event_id)
     {
-        Log::info("Fetching enhanced final results for event", ['event_id' => $event_id]);
+        Log::info("Fetching SIMPLE final results for event", ['event_id' => $event_id]);
 
         try {
-            // Get latest stage
-            $latestStage = Stage::where('event_id', $event_id)
-                ->orderBy('created_at', 'desc')
-                ->first();
-
-            if (!$latestStage) {
-                Log::info("No stages found for event", ['event_id' => $event_id]);
-                return response()->json(['candidates' => [], 'judges' => []], 200);
-            }
-
-            // Get all categories for the latest stage with their weights
-            $categories = Category::where('stage_id', $latestStage->stage_id)
-                ->where('event_id', $event_id)
-                ->get();
-
-            if ($categories->isEmpty()) {
-                Log::info("No categories found for latest stage", ['stage_id' => $latestStage->stage_id]);
-                return response()->json(['candidates' => [], 'judges' => []], 200);
-            }
-
             // Get all active candidates
             $candidates = Candidate::where('event_id', $event_id)
                 ->where('is_active', true)
@@ -470,57 +450,84 @@ class ScoreController extends Controller
                 return response()->json(['candidates' => [], 'judges' => []], 200);
             }
 
+            // Get all categories for the event
+            $categories = Category::where('event_id', $event_id)->get();
+
+            if ($categories->isEmpty()) {
+                Log::info("No categories found", ['event_id' => $event_id]);
+                return response()->json(['candidates' => [], 'judges' => []], 200);
+            }
+
             $results = [];
 
             foreach ($candidates as $candidate) {
-                // Check if candidate has ANY confirmed scores
-                $hasAnyScores = Score::where('event_id', $event_id)
-                    ->where('candidate_id', $candidate->candidate_id)
-                    ->where('stage_id', $latestStage->stage_id)
-                    ->where('status', 'confirmed')
-                    ->exists();
+                Log::info("Processing candidate", [
+                    'candidate_id' => $candidate->candidate_id,
+                    'name' => $candidate->first_name . ' ' . $candidate->last_name
+                ]);
 
-                if (!$hasAnyScores) {
-                    continue; // Skip candidates with no scores at all
+                // Check if candidate has ANY confirmed scores at all
+                $totalConfirmedScores = Score::where('event_id', $event_id)
+                    ->where('candidate_id', $candidate->candidate_id)
+                    ->where('status', 'confirmed')
+                    ->count();
+
+                Log::info("Candidate confirmed scores count", [
+                    'candidate_id' => $candidate->candidate_id,
+                    'confirmed_scores' => $totalConfirmedScores
+                ]);
+
+                if ($totalConfirmedScores == 0) {
+                    Log::info("Skipping candidate - no confirmed scores", [
+                        'candidate_id' => $candidate->candidate_id
+                    ]);
+                    continue; // Skip candidates with no confirmed scores at all
                 }
 
                 $judgeRatings = [];
 
                 // Calculate score for each judge
                 foreach ($judges as $judge) {
-                    $judgeWeightedTotal = 0;
-                    $totalWeight = 0;
-                    $hasScoresForJudge = false;
+                    $judgeTotal = 0;
+                    $categoryCount = 0;
 
-                    // Calculate weighted score for this judge
-                    foreach ($categories as $category) {
-                        $score = Score::where('event_id', $event_id)
-                            ->where('candidate_id', $candidate->candidate_id)
-                            ->where('category_id', $category->category_id)
-                            ->where('judge_id', $judge->judge_id)
-                            ->where('stage_id', $latestStage->stage_id)
-                            ->where('status', 'confirmed')
-                            ->first();
+                    // Get all confirmed scores for this judge and candidate
+                    $judgeScores = Score::where('event_id', $event_id)
+                        ->where('candidate_id', $candidate->candidate_id)
+                        ->where('judge_id', $judge->judge_id)
+                        ->where('status', 'confirmed')
+                        ->with('category')
+                        ->get();
 
-                        if ($score && $score->score !== null) {
-                            $weightedScore = $score->score * ($category->category_weight / 100);
-                            $judgeWeightedTotal += $weightedScore;
-                            $totalWeight += $category->category_weight;
-                            $hasScoresForJudge = true;
+                    if ($judgeScores->isNotEmpty()) {
+                        foreach ($judgeScores as $score) {
+                            if ($score->category) {
+                                // Apply category weight
+                                $weightedScore = $score->score * ($score->category->category_weight / 100);
+                                $judgeTotal += $weightedScore;
+                                $categoryCount++;
+                            }
                         }
-                    }
 
-                    // Include judge rating even if incomplete (partial scores)
-                    if ($hasScoresForJudge) {
-                        // Normalize the weighted total if not all categories are scored
-                        $normalizedRating = $totalWeight > 0 ? ($judgeWeightedTotal / $totalWeight) * 100 : 0;
-                        $judgeRatings[] = $normalizedRating;
+                        if ($categoryCount > 0) {
+                            // Calculate average weighted score for this judge
+                            $judgeAverage = $judgeTotal;
+                            $judgeRatings[] = $judgeAverage;
+                            
+                            Log::info("Judge rating calculated", [
+                                'judge_id' => $judge->judge_id,
+                                'candidate_id' => $candidate->candidate_id,
+                                'judge_total' => $judgeTotal,
+                                'category_count' => $categoryCount,
+                                'judge_average' => $judgeAverage
+                            ]);
+                        }
                     }
                 }
 
-                // Include candidates with at least some judge scores (more lenient)
+                // Only include candidates with at least one judge rating
                 if (!empty($judgeRatings)) {
-                    // Calculate Mean Rating (average of available judge ratings)
+                    // Calculate Mean Rating (average of all judge ratings)
                     $meanRating = array_sum($judgeRatings) / count($judgeRatings);
 
                     $results[] = [
@@ -538,11 +545,21 @@ class ScoreController extends Controller
                         'judges_scored' => count($judgeRatings),
                         'total_judges' => $judges->count(),
                     ];
+
+                    Log::info("Candidate included in results", [
+                        'candidate_id' => $candidate->candidate_id,
+                        'mean_rating' => round($meanRating, 2),
+                        'judges_scored' => count($judgeRatings)
+                    ]);
+                } else {
+                    Log::info("Candidate excluded - no judge ratings", [
+                        'candidate_id' => $candidate->candidate_id
+                    ]);
                 }
             }
 
             if (empty($results)) {
-                Log::info("No candidates with confirmed scores found", ['event_id' => $event_id]);
+                Log::info("No candidates with valid scores found", ['event_id' => $event_id]);
                 return response()->json(['candidates' => [], 'judges' => []], 200);
             }
 
@@ -633,7 +650,7 @@ class ScoreController extends Controller
                 ];
             });
 
-            Log::info("Enhanced final results computed successfully", [
+            Log::info("SIMPLE final results computed successfully", [
                 'result_count' => count($finalResults),
                 'categories_count' => $categories->count(),
                 'judges_count' => $judges->count(),
@@ -647,7 +664,7 @@ class ScoreController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error("Error in finalResults", [
+            Log::error("Error in SIMPLE finalResults", [
                 'event_id' => $event_id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
