@@ -438,6 +438,7 @@ class ScoreController extends Controller
                 ->first();
 
             if (!$latestStage) {
+                Log::info("No stages found for event", ['event_id' => $event_id]);
                 return response()->json(['candidates' => [], 'judges' => []], 200);
             }
 
@@ -447,6 +448,7 @@ class ScoreController extends Controller
                 ->get();
 
             if ($categories->isEmpty()) {
+                Log::info("No categories found for latest stage", ['stage_id' => $latestStage->stage_id]);
                 return response()->json(['candidates' => [], 'judges' => []], 200);
             }
 
@@ -456,6 +458,7 @@ class ScoreController extends Controller
                 ->get();
 
             if ($candidates->isEmpty()) {
+                Log::info("No active candidates found", ['event_id' => $event_id]);
                 return response()->json(['candidates' => [], 'judges' => []], 200);
             }
 
@@ -463,19 +466,31 @@ class ScoreController extends Controller
             $judges = Judge::where('event_id', $event_id)->with('user')->get();
 
             if ($judges->isEmpty()) {
+                Log::info("No judges found", ['event_id' => $event_id]);
                 return response()->json(['candidates' => [], 'judges' => []], 200);
             }
 
             $results = [];
 
             foreach ($candidates as $candidate) {
+                // Check if candidate has ANY confirmed scores
+                $hasAnyScores = Score::where('event_id', $event_id)
+                    ->where('candidate_id', $candidate->candidate_id)
+                    ->where('stage_id', $latestStage->stage_id)
+                    ->where('status', 'confirmed')
+                    ->exists();
+
+                if (!$hasAnyScores) {
+                    continue; // Skip candidates with no scores at all
+                }
+
                 $judgeRatings = [];
 
                 // Calculate score for each judge
                 foreach ($judges as $judge) {
                     $judgeWeightedTotal = 0;
                     $totalWeight = 0;
-                    $hasScores = false;
+                    $hasScoresForJudge = false;
 
                     // Calculate weighted score for this judge
                     foreach ($categories as $category) {
@@ -491,18 +506,21 @@ class ScoreController extends Controller
                             $weightedScore = $score->score * ($category->category_weight / 100);
                             $judgeWeightedTotal += $weightedScore;
                             $totalWeight += $category->category_weight;
-                            $hasScores = true;
+                            $hasScoresForJudge = true;
                         }
                     }
 
-                    if ($hasScores && $totalWeight > 0) {
-                        $judgeRatings[] = $judgeWeightedTotal;
+                    // Include judge rating even if incomplete (partial scores)
+                    if ($hasScoresForJudge) {
+                        // Normalize the weighted total if not all categories are scored
+                        $normalizedRating = $totalWeight > 0 ? ($judgeWeightedTotal / $totalWeight) * 100 : 0;
+                        $judgeRatings[] = $normalizedRating;
                     }
                 }
 
-                // Only include candidates with at least one judge's complete scores
+                // Include candidates with at least some judge scores (more lenient)
                 if (!empty($judgeRatings)) {
-                    // Calculate Mean Rating (average of all judge ratings)
+                    // Calculate Mean Rating (average of available judge ratings)
                     $meanRating = array_sum($judgeRatings) / count($judgeRatings);
 
                     $results[] = [
@@ -517,8 +535,15 @@ class ScoreController extends Controller
                         'sex' => $candidate->sex,
                         'mean_rating' => round($meanRating, 2),
                         'judge_ratings' => $judgeRatings,
+                        'judges_scored' => count($judgeRatings),
+                        'total_judges' => $judges->count(),
                     ];
                 }
+            }
+
+            if (empty($results)) {
+                Log::info("No candidates with confirmed scores found", ['event_id' => $event_id]);
+                return response()->json(['candidates' => [], 'judges' => []], 200);
             }
 
             // Calculate Mean Rank separately for each sex
@@ -527,8 +552,10 @@ class ScoreController extends Controller
                 
                 if (empty($sexResults)) continue;
 
-                // For each judge, rank candidates of this sex
-                foreach ($judges as $judgeIndex => $judge) {
+                // For each judge position, rank candidates of this sex
+                $maxJudges = max(array_column($sexResults, 'judges_scored'));
+                
+                for ($judgeIndex = 0; $judgeIndex < $maxJudges; $judgeIndex++) {
                     $judgeRatings = [];
                     
                     foreach ($sexResults as $result) {
@@ -539,6 +566,8 @@ class ScoreController extends Controller
                             ];
                         }
                     }
+
+                    if (empty($judgeRatings)) continue;
 
                     // Sort by rating (descending) and assign ranks
                     usort($judgeRatings, fn($a, $b) => $b['rating'] <=> $a['rating']);
@@ -561,7 +590,7 @@ class ScoreController extends Controller
                 if (!empty($result['judge_ranks'])) {
                     $result['mean_rank'] = round(array_sum($result['judge_ranks']) / count($result['judge_ranks']), 2);
                 } else {
-                    $result['mean_rank'] = 999; // High number for no scores
+                    $result['mean_rank'] = 999; // High number for no ranks
                 }
             }
 
@@ -608,6 +637,8 @@ class ScoreController extends Controller
                 'result_count' => count($finalResults),
                 'categories_count' => $categories->count(),
                 'judges_count' => $judges->count(),
+                'males_count' => count($males),
+                'females_count' => count($females),
             ]);
 
             return response()->json([
