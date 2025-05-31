@@ -431,168 +431,201 @@ class ScoreController extends Controller
     {
         Log::info("Fetching enhanced final results for event", ['event_id' => $event_id]);
 
-        // Get latest stage
-        $latestStage = Stage::where('event_id', $event_id)
-            ->orderBy('created_at', 'desc')
-            ->first();
+        try {
+            // Get latest stage
+            $latestStage = Stage::where('event_id', $event_id)
+                ->orderBy('created_at', 'desc')
+                ->first();
 
-        if (!$latestStage) {
-            return response()->json(['message' => 'No stages found for this event.'], 404);
-        }
-
-        // Get all categories for the latest stage with their weights
-        $categories = Category::where('stage_id', $latestStage->stage_id)
-            ->where('event_id', $event_id)
-            ->get();
-
-        // Get all active candidates
-        $candidates = Candidate::where('event_id', $event_id)
-            ->where('is_active', true)
-            ->get();
-
-        // Get all judges for this event
-        $judges = Judge::where('event_id', $event_id)->with('user')->get();
-
-        $results = [];
-
-        foreach ($candidates as $candidate) {
-            $judgeRatings = [];
-            $judgeRanks = [];
-
-            // Calculate score for each judge
-            foreach ($judges as $judge) {
-                $judgeWeightedTotal = 0;
-                $totalWeight = 0;
-
-                // Calculate weighted score for this judge
-                foreach ($categories as $category) {
-                    $score = Score::where('event_id', $event_id)
-                        ->where('candidate_id', $candidate->candidate_id)
-                        ->where('category_id', $category->category_id)
-                        ->where('judge_id', $judge->judge_id)
-                        ->where('status', 'confirmed')
-                        ->first();
-
-                    if ($score) {
-                        $weightedScore = $score->score * ($category->category_weight / 100);
-                        $judgeWeightedTotal += $weightedScore;
-                        $totalWeight += $category->category_weight;
-                    }
-                }
-
-                if ($totalWeight > 0) {
-                    $judgeRating = $judgeWeightedTotal; // This is the weighted total, not percentage
-                    $judgeRatings[] = $judgeRating;
-                }
+            if (!$latestStage) {
+                return response()->json(['candidates' => [], 'judges' => []], 200);
             }
 
-            // Calculate Mean Rating (average of all judge ratings)
-            $meanRating = count($judgeRatings) > 0 ? array_sum($judgeRatings) / count($judgeRatings) : 0;
+            // Get all categories for the latest stage with their weights
+            $categories = Category::where('stage_id', $latestStage->stage_id)
+                ->where('event_id', $event_id)
+                ->get();
 
-            $results[] = [
-                'candidate_id' => $candidate->candidate_id,
-                'candidate' => [
-                    'first_name' => $candidate->first_name,
-                    'last_name' => $candidate->last_name,
-                    'candidate_number' => $candidate->candidate_number,
-                    'team' => $candidate->team,
-                    'is_active' => $candidate->is_active,
-                ],
-                'sex' => $candidate->sex,
-                'mean_rating' => $meanRating,
-                'judge_ratings' => $judgeRatings,
-            ];
-        }
+            if ($categories->isEmpty()) {
+                return response()->json(['candidates' => [], 'judges' => []], 200);
+            }
 
-        // Calculate Mean Rank separately for each sex
-        foreach (['M', 'F'] as $sex) {
-            $sexResults = array_filter($results, fn($r) => strtoupper($r['sex']) === $sex);
-            
-            if (empty($sexResults)) continue;
+            // Get all active candidates
+            $candidates = Candidate::where('event_id', $event_id)
+                ->where('is_active', true)
+                ->get();
 
-            // For each judge, rank candidates of this sex
-            foreach ($judges as $judgeIndex => $judge) {
+            if ($candidates->isEmpty()) {
+                return response()->json(['candidates' => [], 'judges' => []], 200);
+            }
+
+            // Get all judges for this event
+            $judges = Judge::where('event_id', $event_id)->with('user')->get();
+
+            if ($judges->isEmpty()) {
+                return response()->json(['candidates' => [], 'judges' => []], 200);
+            }
+
+            $results = [];
+
+            foreach ($candidates as $candidate) {
                 $judgeRatings = [];
-                
-                foreach ($sexResults as $resultIndex => $result) {
-                    if (isset($result['judge_ratings'][$judgeIndex])) {
-                        $judgeRatings[] = [
-                            'candidate_id' => $result['candidate_id'],
-                            'rating' => $result['judge_ratings'][$judgeIndex],
-                            'result_index' => array_search($result, $results)
-                        ];
+
+                // Calculate score for each judge
+                foreach ($judges as $judge) {
+                    $judgeWeightedTotal = 0;
+                    $totalWeight = 0;
+                    $hasScores = false;
+
+                    // Calculate weighted score for this judge
+                    foreach ($categories as $category) {
+                        $score = Score::where('event_id', $event_id)
+                            ->where('candidate_id', $candidate->candidate_id)
+                            ->where('category_id', $category->category_id)
+                            ->where('judge_id', $judge->judge_id)
+                            ->where('stage_id', $latestStage->stage_id)
+                            ->where('status', 'confirmed')
+                            ->first();
+
+                        if ($score && $score->score !== null) {
+                            $weightedScore = $score->score * ($category->category_weight / 100);
+                            $judgeWeightedTotal += $weightedScore;
+                            $totalWeight += $category->category_weight;
+                            $hasScores = true;
+                        }
+                    }
+
+                    if ($hasScores && $totalWeight > 0) {
+                        $judgeRatings[] = $judgeWeightedTotal;
                     }
                 }
 
-                // Sort by rating (descending) and assign ranks
-                usort($judgeRatings, fn($a, $b) => $b['rating'] <=> $a['rating']);
-                
-                foreach ($judgeRatings as $rank => $judgeRating) {
-                    $resultIndex = $judgeRating['result_index'];
-                    if (!isset($results[$resultIndex]['judge_ranks'])) {
-                        $results[$resultIndex]['judge_ranks'] = [];
-                    }
-                    $results[$resultIndex]['judge_ranks'][] = $rank + 1; // 1-based ranking
+                // Only include candidates with at least one judge's complete scores
+                if (!empty($judgeRatings)) {
+                    // Calculate Mean Rating (average of all judge ratings)
+                    $meanRating = array_sum($judgeRatings) / count($judgeRatings);
+
+                    $results[] = [
+                        'candidate_id' => $candidate->candidate_id,
+                        'candidate' => [
+                            'first_name' => $candidate->first_name,
+                            'last_name' => $candidate->last_name,
+                            'candidate_number' => $candidate->candidate_number,
+                            'team' => $candidate->team,
+                            'is_active' => $candidate->is_active,
+                        ],
+                        'sex' => $candidate->sex,
+                        'mean_rating' => round($meanRating, 2),
+                        'judge_ratings' => $judgeRatings,
+                    ];
                 }
             }
-        }
 
-        // Calculate Mean Rank for each candidate
-        foreach ($results as &$result) {
-            if (!empty($result['judge_ranks'])) {
-                $result['mean_rank'] = array_sum($result['judge_ranks']) / count($result['judge_ranks']);
-            } else {
-                $result['mean_rank'] = 999; // High number for no scores
+            // Calculate Mean Rank separately for each sex
+            foreach (['M', 'F'] as $sex) {
+                $sexResults = array_filter($results, fn($r) => strtoupper($r['sex']) === $sex);
+                
+                if (empty($sexResults)) continue;
+
+                // For each judge, rank candidates of this sex
+                foreach ($judges as $judgeIndex => $judge) {
+                    $judgeRatings = [];
+                    
+                    foreach ($sexResults as $result) {
+                        if (isset($result['judge_ratings'][$judgeIndex])) {
+                            $judgeRatings[] = [
+                                'candidate_id' => $result['candidate_id'],
+                                'rating' => $result['judge_ratings'][$judgeIndex]
+                            ];
+                        }
+                    }
+
+                    // Sort by rating (descending) and assign ranks
+                    usort($judgeRatings, fn($a, $b) => $b['rating'] <=> $a['rating']);
+                    
+                    foreach ($judgeRatings as $rank => $judgeRating) {
+                        // Find the result index and add the rank
+                        $resultIndex = array_search($judgeRating['candidate_id'], array_column($results, 'candidate_id'));
+                        if ($resultIndex !== false) {
+                            if (!isset($results[$resultIndex]['judge_ranks'])) {
+                                $results[$resultIndex]['judge_ranks'] = [];
+                            }
+                            $results[$resultIndex]['judge_ranks'][] = $rank + 1; // 1-based ranking
+                        }
+                    }
+                }
             }
-        }
 
-        // Separate and rank by sex
-        $males = array_filter($results, fn($r) => strtoupper($r['sex']) === 'M');
-        $females = array_filter($results, fn($r) => strtoupper($r['sex']) === 'F');
-
-        // Sort each sex by Mean Rank (ascending), then Mean Rating (descending) for tiebreaker
-        usort($males, function($a, $b) {
-            if (abs($a['mean_rank'] - $b['mean_rank']) < 0.01) { // Handle floating point comparison
-                return $b['mean_rating'] <=> $a['mean_rating']; // Higher rating wins
+            // Calculate Mean Rank for each candidate
+            foreach ($results as &$result) {
+                if (!empty($result['judge_ranks'])) {
+                    $result['mean_rank'] = round(array_sum($result['judge_ranks']) / count($result['judge_ranks']), 2);
+                } else {
+                    $result['mean_rank'] = 999; // High number for no scores
+                }
             }
-            return $a['mean_rank'] <=> $b['mean_rank']; // Lower rank wins
-        });
 
-        usort($females, function($a, $b) {
-            if (abs($a['mean_rank'] - $b['mean_rank']) < 0.01) {
-                return $b['mean_rating'] <=> $a['mean_rating'];
+            // Separate and rank by sex
+            $males = array_filter($results, fn($r) => strtoupper($r['sex']) === 'M');
+            $females = array_filter($results, fn($r) => strtoupper($r['sex']) === 'F');
+
+            // Sort each sex by Mean Rank (ascending), then Mean Rating (descending) for tiebreaker
+            usort($males, function($a, $b) {
+                if (abs($a['mean_rank'] - $b['mean_rank']) < 0.01) { // Handle floating point comparison
+                    return $b['mean_rating'] <=> $a['mean_rating']; // Higher rating wins
+                }
+                return $a['mean_rank'] <=> $b['mean_rank']; // Lower rank wins
+            });
+
+            usort($females, function($a, $b) {
+                if (abs($a['mean_rank'] - $b['mean_rank']) < 0.01) {
+                    return $b['mean_rating'] <=> $a['mean_rating'];
+                }
+                return $a['mean_rank'] <=> $b['mean_rank'];
+            });
+
+            // Assign overall rank within each sex
+            foreach ($males as $index => &$male) {
+                $male['overall_rank'] = $index + 1;
             }
-            return $a['mean_rank'] <=> $b['mean_rank'];
-        });
+            
+            foreach ($females as $index => &$female) {
+                $female['overall_rank'] = $index + 1;
+            }
 
-        // Assign overall rank within each sex
-        foreach ($males as $index => &$male) {
-            $male['overall_rank'] = $index + 1;
+            // Combine results
+            $finalResults = array_merge($males, $females);
+
+            // Format judges data
+            $judgesData = $judges->map(function ($judge) {
+                return [
+                    'judge_id' => $judge->judge_id,
+                    'name' => $judge->user->first_name . ' ' . $judge->user->last_name
+                ];
+            });
+
+            Log::info("Enhanced final results computed successfully", [
+                'result_count' => count($finalResults),
+                'categories_count' => $categories->count(),
+                'judges_count' => $judges->count(),
+            ]);
+
+            return response()->json([
+                'candidates' => $finalResults,
+                'judges' => $judgesData
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("Error in finalResults", [
+                'event_id' => $event_id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'message' => 'Failed to fetch final results',
+                'error' => $e->getMessage()
+            ], 500);
         }
-        
-        foreach ($females as $index => &$female) {
-            $female['overall_rank'] = $index + 1;
-        }
-
-        // Combine results
-        $finalResults = array_merge($males, $females);
-
-        // Format judges data
-        $judgesData = $judges->map(function ($judge) {
-            return [
-                'judge_id' => $judge->judge_id,
-                'name' => $judge->user->first_name . ' ' . $judge->user->last_name
-            ];
-        });
-
-        Log::info("Enhanced final results computed with correct weighted scoring", [
-            'result_count' => count($finalResults),
-            'categories_count' => $categories->count(),
-        ]);
-
-        return response()->json([
-            'candidates' => $finalResults,
-            'judges' => $judgesData
-        ]);
     }
 }
