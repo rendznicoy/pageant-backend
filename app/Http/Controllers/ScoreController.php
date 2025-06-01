@@ -429,224 +429,38 @@ class ScoreController extends Controller
 
     public function finalResults($event_id)
     {
-        Log::info("Fetching SIMPLE final results for event", ['event_id' => $event_id]);
+        Log::info("Fetching final results for event", ['event_id' => $event_id]);
 
         try {
-            // Get event details for dynamic max score
+            // Get event details
             $event = Event::findOrFail($event_id);
-            $globalMaxScore = $event->global_max_score ?? 100;
-
-            // Get all active candidates
-            $candidates = Candidate::where('event_id', $event_id)
-                ->where('is_active', true)
-                ->get();
-
-            if ($candidates->isEmpty()) {
-                Log::info("No active candidates found", ['event_id' => $event_id]);
-                return response()->json(['candidates' => [], 'judges' => []], 200);
-            }
-
-            // Get all judges for this event
-            $judges = Judge::where('event_id', $event_id)->with('user')->get();
-
-            if ($judges->isEmpty()) {
-                Log::info("No judges found", ['event_id' => $event_id]);
-                return response()->json(['candidates' => [], 'judges' => []], 200);
-            }
-
-            // Get all categories for the event
-            $categories = Category::where('event_id', $event_id)->get();
-
-            if ($categories->isEmpty()) {
-                Log::info("No categories found", ['event_id' => $event_id]);
-                return response()->json(['candidates' => [], 'judges' => []], 200);
-            }
-
-            $results = [];
-
-            foreach ($candidates as $candidate) {
-                Log::info("Processing candidate", [
-                    'candidate_id' => $candidate->candidate_id,
-                    'name' => $candidate->first_name . ' ' . $candidate->last_name
-                ]);
-
-                // Check if candidate has ANY confirmed scores at all
-                $totalConfirmedScores = Score::where('event_id', $event_id)
-                    ->where('candidate_id', $candidate->candidate_id)
-                    ->where('status', 'confirmed')
-                    ->count();
-
-                Log::info("Candidate confirmed scores count", [
-                    'candidate_id' => $candidate->candidate_id,
-                    'confirmed_scores' => $totalConfirmedScores
-                ]);
-
-                if ($totalConfirmedScores == 0) {
-                    Log::info("Skipping candidate - no confirmed scores", [
-                        'candidate_id' => $candidate->candidate_id
-                    ]);
-                    continue; // Skip candidates with no confirmed scores at all
-                }
-
-                $judgeRatings = [];
-
-                // Calculate score for each judge
-                foreach ($judges as $judge) {
-                    $judgeTotal = 0;
-                    $categoryCount = 0;
-
-                    // Get all confirmed scores for this judge and candidate
-                    $judgeScores = Score::where('event_id', $event_id)
-                        ->where('candidate_id', $candidate->candidate_id)
-                        ->where('judge_id', $judge->judge_id)
-                        ->where('status', 'confirmed')
-                        ->with('category')
-                        ->get();
-
-                    if ($judgeScores->isNotEmpty()) {
-                        foreach ($judgeScores as $score) {
-                            if ($score->category) {
-                                // ✅ FIX: Use globalMaxScore instead of hardcoded 100
-                                $weightedScore = $score->score * ($score->category->category_weight / $globalMaxScore);
-                                $judgeTotal += $weightedScore;
-                                $categoryCount++;
-                            }
-                        }
-
-                        if ($categoryCount > 0) {
-                            // Calculate average weighted score for this judge
-                            $judgeAverage = $judgeTotal;
-                            $judgeRatings[] = $judgeAverage;
-                            
-                            Log::info("Judge rating calculated", [
-                                'judge_id' => $judge->judge_id,
-                                'candidate_id' => $candidate->candidate_id,
-                                'judge_total' => $judgeTotal,
-                                'category_count' => $categoryCount,
-                                'judge_average' => $judgeAverage
-                            ]);
-                        }
-                    }
-                }
-
-                // Only include candidates with at least one judge rating
-                if (!empty($judgeRatings)) {
-                    // Calculate Mean Rating (average of all judge ratings)
-                    $meanRating = array_sum($judgeRatings) / count($judgeRatings);
-
-                    $results[] = [
-                        'candidate_id' => $candidate->candidate_id,
-                        'candidate' => [
-                            'first_name' => $candidate->first_name,
-                            'last_name' => $candidate->last_name,
-                            'candidate_number' => $candidate->candidate_number,
-                            'team' => $candidate->team,
-                            'is_active' => $candidate->is_active,
-                        ],
-                        'sex' => $candidate->sex,
-                        'mean_rating' => round($meanRating, 2),
-                        'judge_ratings' => $judgeRatings,
-                        'judges_scored' => count($judgeRatings),
-                        'total_judges' => $judges->count(),
-                    ];
-
-                    Log::info("Candidate included in results", [
-                        'candidate_id' => $candidate->candidate_id,
-                        'mean_rating' => round($meanRating, 2),
-                        'judges_scored' => count($judgeRatings)
-                    ]);
-                } else {
-                    Log::info("Candidate excluded - no judge ratings", [
-                        'candidate_id' => $candidate->candidate_id
-                    ]);
-                }
-            }
-
-            if (empty($results)) {
-                Log::info("No candidates with valid scores found", ['event_id' => $event_id]);
-                return response()->json(['candidates' => [], 'judges' => []], 200);
-            }
-
-            // Calculate Mean Rank separately for each sex
-            foreach (['M', 'F'] as $sex) {
-                $sexResults = array_filter($results, fn($r) => strtoupper($r['sex']) === $sex);
-                
-                if (empty($sexResults)) continue;
-
-                // For each judge position, rank candidates of this sex
-                $maxJudges = max(array_column($sexResults, 'judges_scored'));
-                
-                for ($judgeIndex = 0; $judgeIndex < $maxJudges; $judgeIndex++) {
-                    $judgeRatings = [];
-                    
-                    foreach ($sexResults as $result) {
-                        if (isset($result['judge_ratings'][$judgeIndex])) {
-                            $judgeRatings[] = [
-                                'candidate_id' => $result['candidate_id'],
-                                'rating' => $result['judge_ratings'][$judgeIndex]
-                            ];
-                        }
-                    }
-
-                    if (empty($judgeRatings)) continue;
-
-                    // Sort by rating (descending) and assign ranks
-                    usort($judgeRatings, fn($a, $b) => $b['rating'] <=> $a['rating']);
-                    
-                    foreach ($judgeRatings as $rank => $judgeRating) {
-                        // Find the result index and add the rank
-                        $resultIndex = array_search($judgeRating['candidate_id'], array_column($results, 'candidate_id'));
-                        if ($resultIndex !== false) {
-                            if (!isset($results[$resultIndex]['judge_ranks'])) {
-                                $results[$resultIndex]['judge_ranks'] = [];
-                            }
-                            $results[$resultIndex]['judge_ranks'][] = $rank + 1; // 1-based ranking
-                        }
-                    }
-                }
-            }
-
-            // Calculate Mean Rank for each candidate
-            foreach ($results as &$result) {
-                if (!empty($result['judge_ranks'])) {
-                    $result['mean_rank'] = round(array_sum($result['judge_ranks']) / count($result['judge_ranks']), 2);
-                } else {
-                    $result['mean_rank'] = 999; // High number for no ranks
-                }
-            }
-
-            // Separate and rank by sex
-            $males = array_filter($results, fn($r) => strtoupper($r['sex']) === 'M');
-            $females = array_filter($results, fn($r) => strtoupper($r['sex']) === 'F');
-
-            // Sort each sex by Mean Rank (ascending), then Mean Rating (descending) for tiebreaker
-            usort($males, function($a, $b) {
-                if (abs($a['mean_rank'] - $b['mean_rank']) < 0.01) { // Handle floating point comparison
-                    return $b['mean_rating'] <=> $a['mean_rating']; // Higher rating wins
-                }
-                return $a['mean_rank'] <=> $b['mean_rank']; // Lower rank wins
-            });
-
-            usort($females, function($a, $b) {
-                if (abs($a['mean_rank'] - $b['mean_rank']) < 0.01) {
-                    return $b['mean_rating'] <=> $a['mean_rating'];
-                }
-                return $a['mean_rank'] <=> $b['mean_rank'];
-            });
-
-            // Assign overall rank within each sex
-            foreach ($males as $index => &$male) {
-                $male['overall_rank'] = $index + 1;
-            }
             
-            foreach ($females as $index => &$female) {
-                $female['overall_rank'] = $index + 1;
+            // Find the latest stage by stage_id (most reliable for sequential stages)
+            $latestStage = Stage::where('event_id', $event_id)
+                ->orderBy('stage_id', 'desc')  // ✅ Use stage_id instead of created_at
+                ->first();
+
+            if (!$latestStage) {
+                Log::info("No stages found for event", ['event_id' => $event_id]);
+                return response()->json(['candidates' => [], 'judges' => []], 200);
             }
 
-            // Combine results
-            $finalResults = array_merge($males, $females);
+            Log::info("Using latest stage for final results", [
+                'event_id' => $event_id,
+                'stage_id' => $latestStage->stage_id,
+                'stage_name' => $latestStage->stage_name,
+                'stage_status' => $latestStage->status
+            ]);
 
-            // Format judges data
+            // Get the permanent partial results from the latest stage
+            $stageController = new StageController();
+            $partialResults = $stageController->permanentPartialResults($event_id, $latestStage->stage_id);
+            
+            // Extract the response data
+            $responseData = $partialResults->getData(true);
+            
+            // Get judges data
+            $judges = Judge::where('event_id', $event_id)->with('user')->get();
             $judgesData = $judges->map(function ($judge) {
                 return [
                     'judge_id' => $judge->judge_id,
@@ -654,22 +468,21 @@ class ScoreController extends Controller
                 ];
             });
 
-            Log::info("SIMPLE final results computed successfully", [
-                'result_count' => count($finalResults),
-                'categories_count' => $categories->count(),
-                'judges_count' => $judges->count(),
-                'males_count' => count($males),
-                'females_count' => count($females),
-                'global_max_score' => $globalMaxScore,
+            Log::info("Final results computed using latest stage partial results", [
+                'event_id' => $event_id,
+                'stage_id' => $latestStage->stage_id,
+                'stage_name' => $latestStage->stage_name,
+                'candidates_count' => count($responseData['candidates'] ?? []),
+                'judges_count' => $judges->count()
             ]);
 
             return response()->json([
-                'candidates' => $finalResults,
+                'candidates' => $responseData['candidates'] ?? [],
                 'judges' => $judgesData
             ]);
 
         } catch (\Exception $e) {
-            Log::error("Error in SIMPLE finalResults", [
+            Log::error("Error in finalResults", [
                 'event_id' => $event_id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
