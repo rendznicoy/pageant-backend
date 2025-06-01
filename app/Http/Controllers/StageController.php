@@ -322,12 +322,17 @@ class StageController extends Controller
         Log::info("Fetching partial results", ['event_id' => $event_id, 'stage_id' => $stage_id]);
         $stage = Stage::where('event_id', $event_id)->findOrFail($stage_id);
 
+        // Get event details for normalization
+        $event = Event::findOrFail($event_id);
+        $globalMaxScore = $event->global_max_score ?? 100;
+        $normalizationFactor = 100 / $globalMaxScore;
+
         // Get active candidates
         $candidates = Candidate::where('event_id', $event_id)
             ->where('is_active', true)
             ->get();
 
-        // Get confirmed scores for the stage
+        // Get confirmed scores for the stage with normalization
         $scores = Score::where('scores.stage_id', $stage_id)
             ->where('scores.event_id', $event_id)
             ->where('scores.status', 'confirmed')
@@ -342,7 +347,8 @@ class StageController extends Controller
                 'candidates.first_name',
                 'candidates.last_name',
                 'candidates.candidate_number',
-                DB::raw('SUM(CAST(scores.score AS DECIMAL(10,2)) * COALESCE(categories.category_weight, 0) / 100) as weighted_score')
+                // Apply normalization factor here
+                DB::raw('SUM(CAST(scores.score AS DECIMAL(10,2)) * COALESCE(categories.category_weight, 0) * ' . $normalizationFactor . ') as weighted_score')
             )
             ->groupBy('scores.candidate_id', 'scores.judge_id', 'candidates.sex', 'candidates.first_name', 'candidates.last_name', 'candidates.candidate_number')
             ->get();
@@ -421,8 +427,8 @@ class StageController extends Controller
             $sexResults = collect($results)->where('sex', $sex)
                 ->filter(fn($r) => $r['raw_average'] !== null)
                 ->sortBy([
-                    ['raw_average', 'desc'],
-                    ['mean_rank', 'asc'] // Lower mean rank is better for tiebreaking
+                    ['mean_rank', 'asc'], // Lower mean rank is better
+                    ['raw_average', 'desc'] // Higher rating for tiebreaking
                 ])
                 ->values();
 
@@ -457,12 +463,18 @@ class StageController extends Controller
             return $a['rank'] <=> $b['rank'];
         });
 
-        Log::info("Partial results computed with proper ranking", [
+        Log::info("Partial results computed with normalization", [
             'stage_id' => $stage_id,
             'results_count' => count($results),
+            'global_max_score' => $globalMaxScore,
+            'normalization_factor' => $normalizationFactor,
         ]);
 
-        return $this->permanentPartialResults($event_id, $stage_id);
+        return response()->json([
+            'candidates' => $results,
+            'males' => array_filter($results, fn($r) => $r['sex'] === 'M'),
+            'females' => array_filter($results, fn($r) => $r['sex'] === 'F'),
+        ]);
     }
 
     public function categoryResults($event_id, $stage_id)
@@ -549,6 +561,11 @@ class StageController extends Controller
         
         $stage = Stage::where('event_id', $event_id)->findOrFail($stage_id);
 
+        // Get event details for normalization
+        $event = Event::findOrFail($event_id);
+        $globalMaxScore = $event->global_max_score ?? 100;
+        $normalizationFactor = 100 / $globalMaxScore;
+
         // Get only ACTIVE candidates
         $candidates = Candidate::where('event_id', $event_id)
             ->where('is_active', true)
@@ -562,13 +579,13 @@ class StageController extends Controller
             ]);
         }
 
-        // Get confirmed scores for active candidates only
+        // Get confirmed scores for active candidates only with normalization
         $scores = Score::where('scores.stage_id', $stage_id)
             ->where('scores.event_id', $event_id)
             ->where('scores.status', 'confirmed')
             ->whereNotNull('scores.score')
             ->where('scores.score', '>=', 0)
-            ->where('scores.score', '<=', 100)
+            ->where('scores.score', '<=', $globalMaxScore) // Use dynamic max score
             ->join('candidates', 'scores.candidate_id', '=', 'candidates.candidate_id')
             ->join('categories', 'scores.category_id', '=', 'categories.category_id')
             ->where('candidates.is_active', true)
@@ -581,7 +598,8 @@ class StageController extends Controller
                 'candidates.candidate_number',
                 'candidates.team',
                 'candidates.is_active',
-                DB::raw('SUM(CAST(scores.score AS DECIMAL(10,2)) * COALESCE(categories.category_weight, 0) / 100) as weighted_score')
+                // Apply normalization factor in the SQL query
+                DB::raw('SUM(CAST(scores.score AS DECIMAL(10,2)) * COALESCE(categories.category_weight, 0) * ' . $normalizationFactor . ') as weighted_score')
             )
             ->groupBy('scores.candidate_id', 'scores.judge_id', 'candidates.sex', 'candidates.first_name', 'candidates.last_name', 'candidates.candidate_number', 'candidates.team', 'candidates.is_active')
             ->havingRaw('weighted_score IS NOT NULL AND weighted_score >= 0')
@@ -675,10 +693,12 @@ class StageController extends Controller
             return $candidate;
         });
 
-        Log::info("Active partial results computed", [
+        Log::info("Active partial results computed with normalization", [
             'stage_id' => $stage_id,
             'males_count' => $rankedMales->count(),
             'females_count' => $rankedFemales->count(),
+            'global_max_score' => $globalMaxScore,
+            'normalization_factor' => $normalizationFactor,
         ]);
 
         return response()->json([
