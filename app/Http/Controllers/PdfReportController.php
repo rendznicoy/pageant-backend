@@ -83,14 +83,38 @@ class PdfReportController extends Controller
         $event = Event::findOrFail($event_id);
         $globalMaxScore = $event->global_max_score ?? 100;
 
-        // Get latest stage
+        // ✅ FIX: Get the current/latest stage in the proper sequence
+        // Priority: 1) Active stage, 2) Most recently finalized stage, 3) Latest stage by ID
         $latestStage = Stage::where('event_id', $event_id)
-            ->orderBy('created_at', 'desc')
+            ->where('status', 'active')
             ->first();
 
         if (!$latestStage) {
+            // If no active stage, get the most recently finalized stage
+            $latestStage = Stage::where('event_id', $event_id)
+                ->where('status', 'finalized')
+                ->orderBy('stage_id', 'desc')
+                ->first();
+        }
+
+        if (!$latestStage) {
+            // If no finalized stages, get the latest stage by ID (sequence order)
+            $latestStage = Stage::where('event_id', $event_id)
+                ->orderBy('stage_id', 'desc')
+                ->first();
+        }
+
+        if (!$latestStage) {
+            Log::warning('No stages found for event', ['event_id' => $event_id]);
             return ['candidates' => [], 'judges' => []];
         }
+
+        Log::info('Using stage for PDF results', [
+            'event_id' => $event_id,
+            'stage_id' => $latestStage->stage_id,
+            'stage_name' => $latestStage->stage_name,
+            'stage_status' => $latestStage->status
+        ]);
 
         // Get all categories for the latest stage with their weights
         $categories = Category::where('stage_id', $latestStage->stage_id)
@@ -244,6 +268,8 @@ class PdfReportController extends Controller
 
         Log::info("PDF final results computed with correct weighted scoring", [
             'event_id' => $event_id,
+            'stage_id' => $latestStage->stage_id,
+            'stage_name' => $latestStage->stage_name,
             'global_max_score' => $globalMaxScore,
             'results_count' => count($finalResults),
         ]);
