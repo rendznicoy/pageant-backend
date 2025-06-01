@@ -265,6 +265,7 @@ class DatabaseSeeder extends Seeder
         if ($eventIndex === 0) { // Only log for first event
             $this->logSampleCalculations($event, $judges->first(), $candidates->first(), $categories);
         }
+        $this->logDetailedCalculations($event, $judges, $candidates, $categories);
     }
 
     private function generateScore($candidateNumber, $judgeId, $categoryName, $maxScore, $performanceLevels, $judgeBiases, $extraVariance = 0)
@@ -407,5 +408,52 @@ class DatabaseSeeder extends Seeder
         echo "Expected range: {$expectedMin} - {$expectedMax}\n";
         echo "Actual result: {$weightedTotal} " . ($weightedTotal >= $expectedMin && $weightedTotal <= $expectedMax ? "✓ GOOD" : "⚠ CHECK") . "\n";
         echo "=======================================\n\n";
+    }
+
+    private function logDetailedCalculations($event, $judges, $candidates, $categories)
+    {
+        echo "\n=== DETAILED VERIFICATION FOR {$event->event_name} ===\n";
+        echo "Global Max Score: {$event->global_max_score}\n";
+        echo "Expected Final Results Range: 0-100 (normalized)\n\n";
+
+        // Get the Finals stage (latest stage)
+        $finalsStage = $event->stages()->where('stage_name', 'Finals')->first();
+        $finalsCategories = $categories->where('stage_id', $finalsStage->stage_id);
+        
+        // Test first 3 candidates with first judge
+        $testCandidates = $candidates->take(3);
+        $testJudge = $judges->first();
+        
+        echo "FINALS STAGE CALCULATION (Latest Stage):\n";
+        echo "Judge: {$testJudge->user->first_name} {$testJudge->user->last_name}\n\n";
+        
+        foreach ($testCandidates as $candidate) {
+            echo "Candidate: {$candidate->first_name} {$candidate->last_name} (#{$candidate->candidate_number})\n";
+            
+            $judgeTotal = 0;
+            foreach ($finalsCategories as $category) {
+                $score = Score::where([
+                    'event_id' => $event->event_id,
+                    'judge_id' => $testJudge->judge_id,
+                    'candidate_id' => $candidate->candidate_id,
+                    'category_id' => $category->category_id,
+                    'stage_id' => $finalsStage->stage_id,
+                ])->first();
+                
+                if ($score) {
+                    // This is the key calculation that should match our normalization
+                    $weightedScore = $score->score * $category->category_weight / $event->global_max_score;
+                    $judgeTotal += $weightedScore;
+                    
+                    echo "  {$category->category_name}: {$score->score} × {$category->category_weight}% ÷ {$event->global_max_score} = {$weightedScore}\n";
+                }
+            }
+            
+            echo "  JUDGE TOTAL: {$judgeTotal}\n";
+            echo "  EXPECTED RANGE: 0-100 (normalized)\n";
+            echo "  STATUS: " . ($judgeTotal >= 0 && $judgeTotal <= 100 ? "✅ GOOD" : "⚠️ NEEDS CHECK") . "\n\n";
+        }
+        
+        echo "========================================\n\n";
     }
 }

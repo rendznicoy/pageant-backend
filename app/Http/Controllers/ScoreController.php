@@ -435,9 +435,9 @@ class ScoreController extends Controller
             // Get event details
             $event = Event::findOrFail($event_id);
             
-            // Find the latest active or most recent stage
+            // Find the latest stage by stage_id (most reliable for sequential stages)
             $latestStage = Stage::where('event_id', $event_id)
-                ->orderBy('created_at', 'desc')
+                ->orderBy('stage_id', 'desc')  // ✅ Use stage_id instead of created_at
                 ->first();
 
             if (!$latestStage) {
@@ -448,7 +448,8 @@ class ScoreController extends Controller
             Log::info("Using latest stage for final results", [
                 'event_id' => $event_id,
                 'stage_id' => $latestStage->stage_id,
-                'stage_name' => $latestStage->stage_name
+                'stage_name' => $latestStage->stage_name,
+                'stage_status' => $latestStage->status
             ]);
 
             // Get the permanent partial results from the latest stage
@@ -470,6 +471,7 @@ class ScoreController extends Controller
             Log::info("Final results computed using latest stage partial results", [
                 'event_id' => $event_id,
                 'stage_id' => $latestStage->stage_id,
+                'stage_name' => $latestStage->stage_name,
                 'candidates_count' => count($responseData['candidates'] ?? []),
                 'judges_count' => $judges->count()
             ]);
