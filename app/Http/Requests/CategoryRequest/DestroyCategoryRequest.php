@@ -21,6 +21,7 @@ class DestroyCategoryRequest extends FormRequest
         $this->merge([
             'event_id' => $this->route('event_id'),
             'category_id' => $this->route('category_id'),
+            'stage_id' => $this->query('stage_id'),
         ]);
     }
 
