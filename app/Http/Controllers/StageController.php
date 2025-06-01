@@ -695,7 +695,6 @@ class StageController extends Controller
         
         $stage = Stage::where('event_id', $event_id)->findOrFail($stage_id);
         $event = Event::findOrFail($event_id);
-        $globalMaxScore = $event->global_max_score ?? 100;
 
         // Get ALL candidates from the event
         $candidates = Candidate::where('event_id', $event_id)->get();
@@ -716,91 +715,40 @@ class StageController extends Controller
 
         $processedResults = [];
         
-        foreach (['M', 'F'] as $sex) {
-            $sexCandidates = $candidates->where('sex', $sex);
-            
-            foreach ($sexCandidates as $candidate) {
-                $judgeRatings = [];
+        foreach ($candidates as $candidate) {
+            // Use the service to calculate judge ratings for this stage
+            $judgeRatings = ScoreCalculationService::calculateCandidateJudgeRatings(
+                $event_id, 
+                $candidate->candidate_id, 
+                $categories, 
+                $stage_id
+            );
 
-                // Calculate weighted score for each judge using the service
-                foreach ($judges as $judge) {
-                    $judgeWeightedScore = ScoreCalculationService::calculateJudgeWeightedScore(
-                        $event_id,
-                        $candidate->candidate_id,
-                        $judge->judge_id,
-                        $categories,
-                        $stage_id
-                    );
-
-                    if ($judgeWeightedScore !== null) {
-                        $judgeRatings[] = $judgeWeightedScore;
-                    }
-                }
-
-                if (empty($judgeRatings)) {
-                    continue; // Skip candidates with no scores
-                }
-
-                // Calculate mean rating (same as final results)
-                $meanRating = array_sum($judgeRatings) / count($judgeRatings);
-
-                $processedResults[] = [
-                    'candidate_id' => $candidate->candidate_id,
-                    'candidate' => [
-                        'first_name' => $candidate->first_name,
-                        'last_name' => $candidate->last_name,
-                        'candidate_number' => $candidate->candidate_number,
-                        'team' => $candidate->team,
-                        'is_active' => $candidate->is_active,
-                    ],
-                    'sex' => $candidate->sex,
-                    'mean_rating' => $meanRating,
-                    'judge_ratings' => $judgeRatings,
-                ];
+            if (empty($judgeRatings)) {
+                continue; // Skip candidates with no scores
             }
+
+            // Calculate mean rating using the service
+            $meanRating = ScoreCalculationService::calculateMeanRating($judgeRatings);
+
+            $processedResults[] = [
+                'candidate_id' => $candidate->candidate_id,
+                'candidate' => [
+                    'first_name' => $candidate->first_name,
+                    'last_name' => $candidate->last_name,
+                    'candidate_number' => $candidate->candidate_number,
+                    'team' => $candidate->team,
+                    'is_active' => $candidate->is_active,
+                ],
+                'sex' => $candidate->sex,
+                'mean_rating' => $meanRating,
+                'judge_ratings' => $judgeRatings,
+            ];
         }
 
-        // Calculate Mean Rank separately for each sex (same logic as final results)
-        foreach (['M', 'F'] as $sex) {
-            $sexResults = array_filter($processedResults, fn($r) => strtoupper($r['sex']) === $sex);
-            
-            if (empty($sexResults)) continue;
-
-            // For each judge, rank candidates of this sex
-            foreach ($judges as $judgeIndex => $judge) {
-                $judgeRatings = [];
-                
-                foreach ($sexResults as $resultIndex => $result) {
-                    if (isset($result['judge_ratings'][$judgeIndex])) {
-                        $judgeRatings[] = [
-                            'candidate_id' => $result['candidate_id'],
-                            'rating' => $result['judge_ratings'][$judgeIndex],
-                            'original_index' => array_search($result, $processedResults)
-                        ];
-                    }
-                }
-
-                // Sort by rating (descending) and assign ranks
-                usort($judgeRatings, fn($a, $b) => $b['rating'] <=> $a['rating']);
-                
-                foreach ($judgeRatings as $rank => $judgeRating) {
-                    $originalIndex = $judgeRating['original_index'];
-                    if (!isset($processedResults[$originalIndex]['judge_ranks'])) {
-                        $processedResults[$originalIndex]['judge_ranks'] = [];
-                    }
-                    $processedResults[$originalIndex]['judge_ranks'][] = $rank + 1;
-                }
-            }
-        }
-
-        // Calculate Mean Rank for each candidate
-        foreach ($processedResults as &$result) {
-            if (!empty($result['judge_ranks'])) {
-                $result['mean_rank'] = array_sum($result['judge_ranks']) / count($result['judge_ranks']);
-            } else {
-                $result['mean_rank'] = 999;
-            }
-        }
+        // Calculate Mean Rank separately for each sex using the service
+        $processedResults = ScoreCalculationService::calculateMeanRanks($processedResults, 'M');
+        $processedResults = ScoreCalculationService::calculateMeanRanks($processedResults, 'F');
 
         // Separate and rank by sex
         $males = array_filter($processedResults, fn($r) => strtoupper($r['sex']) === 'M');
@@ -837,7 +785,6 @@ class StageController extends Controller
             'stage_id' => $stage_id,
             'males_count' => count($rankedMales),
             'females_count' => count($rankedFemales),
-            'global_max_score' => $globalMaxScore
         ]);
 
         return response()->json([
