@@ -716,7 +716,6 @@ class StageController extends Controller
         // Get event details for normalization
         $event = Event::findOrFail($event_id);
         $globalMaxScore = $event->global_max_score ?? 100;
-        $normalizationFactor = 100 / $globalMaxScore;
 
         // Get ALL candidates from the event
         $candidates = Candidate::where('event_id', $event_id)->get();
@@ -732,8 +731,8 @@ class StageController extends Controller
         // Get categories for this stage
         $categories = Category::where('stage_id', $stage_id)->get();
         
-        // Get all judges for this event
-        $judges = Judge::where('event_id', $event_id)->get();
+        // Get all judges for this event - ✅ Add explicit ordering
+        $judges = Judge::where('event_id', $event_id)->orderBy('judge_id')->get();
 
         $processedResults = [];
         
@@ -758,8 +757,7 @@ class StageController extends Controller
                             ->first();
 
                         if ($score) {
-                            // Apply normalization factor to the weight calculation
-                            $weightedScore = $score->score * $category->category_weight / $globalMaxScore;
+                            $weightedScore = $score->score * ($category->category_weight / 100);
                             $judgeWeightedTotal += $weightedScore;
                             $hasScores = true;
                         }
@@ -793,23 +791,28 @@ class StageController extends Controller
             }
         }
 
-        // Rest of the method remains the same for rank calculations...
+        // ✅ Fixed ranking calculation
         // Calculate Mean Rank separately for each sex
         foreach (['M', 'F'] as $sex) {
             $sexResults = array_filter($processedResults, fn($r) => strtoupper($r['sex']) === $sex);
             
             if (empty($sexResults)) continue;
 
+            // Create a mapping from candidate_id to array index for this sex
+            $candidateIndexMap = [];
+            foreach ($sexResults as $index => $result) {
+                $candidateIndexMap[$result['candidate_id']] = array_search($result, $processedResults);
+            }
+
             // For each judge, rank candidates of this sex
             foreach ($judges as $judgeIndex => $judge) {
                 $judgeRatings = [];
                 
-                foreach ($sexResults as $resultIndex => $result) {
+                foreach ($sexResults as $result) {
                     if (isset($result['judge_ratings'][$judgeIndex])) {
                         $judgeRatings[] = [
                             'candidate_id' => $result['candidate_id'],
-                            'rating' => $result['judge_ratings'][$judgeIndex],
-                            'original_index' => array_search($result, $processedResults)
+                            'rating' => $result['judge_ratings'][$judgeIndex]
                         ];
                     }
                 }
@@ -818,7 +821,7 @@ class StageController extends Controller
                 usort($judgeRatings, fn($a, $b) => $b['rating'] <=> $a['rating']);
                 
                 foreach ($judgeRatings as $rank => $judgeRating) {
-                    $originalIndex = $judgeRating['original_index'];
+                    $originalIndex = $candidateIndexMap[$judgeRating['candidate_id']];
                     if (!isset($processedResults[$originalIndex]['judge_ranks'])) {
                         $processedResults[$originalIndex]['judge_ranks'] = [];
                     }
@@ -871,8 +874,6 @@ class StageController extends Controller
             'stage_id' => $stage_id,
             'males_count' => count($rankedMales),
             'females_count' => count($rankedFemales),
-            'global_max_score' => $globalMaxScore,
-            'normalization_factor' => $normalizationFactor,
         ]);
 
         return response()->json([
