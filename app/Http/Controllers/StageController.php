@@ -757,7 +757,8 @@ class StageController extends Controller
                             ->first();
 
                         if ($score) {
-                            $weightedScore = $score->score * ($category->category_weight / 100);
+                            // ✅ FIX: Use globalMaxScore instead of hardcoded 100
+                            $weightedScore = $score->score * ($category->category_weight / $globalMaxScore);
                             $judgeWeightedTotal += $weightedScore;
                             $hasScores = true;
                         }
@@ -874,6 +875,7 @@ class StageController extends Controller
             'stage_id' => $stage_id,
             'males_count' => count($rankedMales),
             'females_count' => count($rankedFemales),
+            'global_max_score' => $globalMaxScore,
         ]);
 
         return response()->json([
