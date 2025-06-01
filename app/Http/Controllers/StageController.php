@@ -348,7 +348,7 @@ class StageController extends Controller
                 'candidates.last_name',
                 'candidates.candidate_number',
                 // Apply normalization factor here
-                DB::raw('SUM(CAST(scores.score AS DECIMAL(10,2)) * COALESCE(categories.category_weight, 0) * ' . $normalizationFactor . ') as weighted_score')
+                DB::raw('SUM(CAST(scores.score AS DECIMAL(10,2)) * COALESCE(categories.category_weight, 0) / ' . $globalMaxScore . ') as weighted_score')
             )
             ->groupBy('scores.candidate_id', 'scores.judge_id', 'candidates.sex', 'candidates.first_name', 'candidates.last_name', 'candidates.candidate_number')
             ->get();
@@ -599,7 +599,7 @@ class StageController extends Controller
                 'candidates.team',
                 'candidates.is_active',
                 // Apply normalization factor in the SQL query
-                DB::raw('SUM(CAST(scores.score AS DECIMAL(10,2)) * COALESCE(categories.category_weight, 0) * ' . $normalizationFactor . ') as weighted_score')
+                DB::raw('SUM(CAST(scores.score AS DECIMAL(10,2)) * COALESCE(categories.category_weight, 0) / ' . $globalMaxScore . ') as weighted_score')
             )
             ->groupBy('scores.candidate_id', 'scores.judge_id', 'candidates.sex', 'candidates.first_name', 'candidates.last_name', 'candidates.candidate_number', 'candidates.team', 'candidates.is_active')
             ->havingRaw('weighted_score IS NOT NULL AND weighted_score >= 0')
@@ -759,7 +759,7 @@ class StageController extends Controller
 
                         if ($score) {
                             // Apply normalization factor to the weight calculation
-                            $weightedScore = $score->score * $category->category_weight * $normalizationFactor;
+                            $weightedScore = $score->score * $category->category_weight / $globalMaxScore;
                             $judgeWeightedTotal += $weightedScore;
                             $hasScores = true;
                         }
@@ -918,8 +918,8 @@ class StageController extends Controller
                 'candidates.team',
                 'candidates.is_active',
                 // Apply normalization factor in the SQL query
-                DB::raw('SUM(CAST(scores.score AS DECIMAL(10,2)) * COALESCE(categories.category_weight, 0) * ' . $normalizationFactor . ') as weighted_score'),
-                DB::raw('ROW_NUMBER() OVER (PARTITION BY scores.judge_id ORDER BY SUM(CAST(scores.score AS DECIMAL(10,2)) * COALESCE(categories.category_weight, 0) * ' . $normalizationFactor . ') DESC) as judge_rank')
+                DB::raw('SUM(CAST(scores.score AS DECIMAL(10,2)) * COALESCE(categories.category_weight, 0) / ' . $globalMaxScore . ') as weighted_score'),
+                DB::raw('ROW_NUMBER() OVER (PARTITION BY scores.judge_id ORDER BY SUM(CAST(scores.score AS DECIMAL(10,2)) * COALESCE(categories.category_weight, 0) / ' . $globalMaxScore . ') DESC) as judge_rank')
             )
             ->groupBy('scores.candidate_id', 'scores.judge_id', 'candidates.sex', 'candidates.first_name', 'candidates.last_name', 'candidates.candidate_number', 'candidates.team', 'candidates.is_active')
             ->havingRaw('weighted_score IS NOT NULL AND weighted_score >= 0')

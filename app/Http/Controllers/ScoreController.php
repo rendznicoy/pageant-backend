@@ -508,7 +508,7 @@ class ScoreController extends Controller
                         foreach ($judgeScores as $score) {
                             if ($score->category) {
                                 // Apply category weight with normalization
-                                $weightedScore = $score->score * $score->category->category_weight * $normalizationFactor;
+                                $weightedScore = $score->score * $score->category->category_weight / $globalMaxScore;
                                 $judgeTotal += $weightedScore;
                                 $categoryCount++;
                             }
