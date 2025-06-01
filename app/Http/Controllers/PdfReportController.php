@@ -79,10 +79,9 @@ class PdfReportController extends Controller
     
     private function getFinalResultsData($event_id)
     {
-        // Get event details for max score and normalization
+        // Get event details for dynamic max score
         $event = Event::findOrFail($event_id);
         $globalMaxScore = $event->global_max_score ?? 100;
-        $normalizationFactor = 100 / $globalMaxScore;
 
         // Get latest stage
         $latestStage = Stage::where('event_id', $event_id)
@@ -127,8 +126,8 @@ class PdfReportController extends Controller
                     $categoryAverage = array_sum($rawScores) / count($rawScores);
                     $categoryScores[] = $categoryAverage;
 
-                    // Step 3: Apply category weight with normalization to get score out of 100
-                    $weightedScore = $categoryAverage * $category->category_weight * $normalizationFactor;
+                    // Step 3: Apply category weight using dynamic globalMaxScore
+                    $weightedScore = $categoryAverage * ($category->category_weight / $globalMaxScore);
                     $weightedTotal += $weightedScore;
                 }
             }
@@ -173,8 +172,8 @@ class PdfReportController extends Controller
                     foreach ($judgeScores as $score) {
                         $category = $categories->firstWhere('category_id', $score->category_id);
                         if ($category) {
-                            // Apply normalization factor
-                            $weightedScore = $score->score * $category->category_weight * $normalizationFactor;
+                            // ✅ FIX: Use globalMaxScore instead of normalization factor
+                            $weightedScore = $score->score * ($category->category_weight / $globalMaxScore);
                             $judgeTotal += $weightedScore;
                         }
                     }
@@ -203,7 +202,6 @@ class PdfReportController extends Controller
             }
         }
 
-        // Rest of the method remains the same for final ranking...
         // Step 6: Calculate Mean Rank for each candidate
         foreach ($results as &$result) {
             $ranks = [];
@@ -243,6 +241,12 @@ class PdfReportController extends Controller
 
         // Combine results back
         $finalResults = array_merge($maleResults, $femaleResults);
+
+        Log::info("PDF final results computed with correct weighted scoring", [
+            'event_id' => $event_id,
+            'global_max_score' => $globalMaxScore,
+            'results_count' => count($finalResults),
+        ]);
 
         return [
             'candidates' => $finalResults,
