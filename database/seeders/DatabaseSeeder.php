@@ -262,6 +262,9 @@ class DatabaseSeeder extends Seeder
                 }
             }
         }
+        if ($eventIndex === 0) { // Only log for first event
+            $this->logSampleCalculations($event, $judges->first(), $candidates->first(), $categories);
+        }
     }
 
     private function generateScore($candidateNumber, $judgeId, $categoryName, $maxScore, $performanceLevels, $judgeBiases, $extraVariance = 0)
@@ -360,5 +363,49 @@ class DatabaseSeeder extends Seeder
                 'Needs to work on fundamental skills.',
             ])->random();
         }
+    }
+
+    private function logSampleCalculations($event, $sampleJudge, $sampleCandidate, $categories)
+    {
+        echo "\n=== Sample Calculation Verification for Event: {$event->event_name} ===\n";
+        echo "Max Score: {$event->global_max_score}\n";
+        echo "Sample Judge: {$sampleJudge->user->first_name} {$sampleJudge->user->last_name}\n";
+        echo "Sample Candidate: {$sampleCandidate->first_name} {$sampleCandidate->last_name}\n\n";
+
+        // Check Preliminaries stage
+        $prelimStage = $event->stages()->where('stage_name', 'Preliminaries')->first();
+        $prelimCategories = $categories->where('stage_id', $prelimStage->stage_id);
+        
+        echo "PRELIMINARIES CALCULATION:\n";
+        $weightedTotal = 0;
+        $totalWeight = 0;
+        
+        foreach ($prelimCategories as $category) {
+            $score = Score::where([
+                'event_id' => $event->event_id,
+                'judge_id' => $sampleJudge->judge_id,
+                'candidate_id' => $sampleCandidate->candidate_id,
+                'category_id' => $category->category_id,
+                'stage_id' => $prelimStage->stage_id,
+            ])->first();
+            
+            if ($score) {
+                $weightedScore = $score->score * ($category->category_weight / 100);
+                $weightedTotal += $weightedScore;
+                $totalWeight += $category->category_weight;
+                
+                echo "  {$category->category_name}: {$score->score} × {$category->category_weight}% = {$weightedScore}\n";
+            }
+        }
+        
+        echo "  TOTAL: {$weightedTotal} (weights sum: {$totalWeight}%)\n\n";
+        
+        // Expected range for verification
+        $expectedMin = $event->global_max_score * 0.6; // 60% of max as minimum reasonable total
+        $expectedMax = $event->global_max_score * 1.0; // 100% of max as maximum reasonable total
+        
+        echo "Expected range: {$expectedMin} - {$expectedMax}\n";
+        echo "Actual result: {$weightedTotal} " . ($weightedTotal >= $expectedMin && $weightedTotal <= $expectedMax ? "✓ GOOD" : "⚠ CHECK") . "\n";
+        echo "=======================================\n\n";
     }
 }

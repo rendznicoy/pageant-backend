@@ -79,9 +79,10 @@ class PdfReportController extends Controller
     
     private function getFinalResultsData($event_id)
     {
-        // Get event details for max score
+        // Get event details for max score and normalization
         $event = Event::findOrFail($event_id);
-        $maxScore = $event->max_score ?? 100;
+        $globalMaxScore = $event->global_max_score ?? 100;
+        $normalizationFactor = 100 / $globalMaxScore;
 
         // Get latest stage
         $latestStage = Stage::where('event_id', $event_id)
@@ -110,7 +111,6 @@ class PdfReportController extends Controller
         foreach ($candidates as $candidate) {
             $categoryScores = [];
             $weightedTotal = 0;
-            $totalWeight = 0;
             $judgeRanks = [];
 
             foreach ($categories as $category) {
@@ -127,15 +127,14 @@ class PdfReportController extends Controller
                     $categoryAverage = array_sum($rawScores) / count($rawScores);
                     $categoryScores[] = $categoryAverage;
 
-                    // Step 3: Apply category weight to the average
-                    $weightedScore = $categoryAverage * ($category->category_weight / 100);
+                    // Step 3: Apply category weight with normalization to get score out of 100
+                    $weightedScore = $categoryAverage * $category->category_weight * $normalizationFactor;
                     $weightedTotal += $weightedScore;
-                    $totalWeight += $category->category_weight;
                 }
             }
 
-            // Step 4: Calculate Mean Rating (weighted average of all categories)
-            $meanRating = $totalWeight > 0 ? ($weightedTotal / $totalWeight) * 100 : 0;
+            // Step 4: Calculate Mean Rating (sum of all weighted category scores)
+            $meanRating = $weightedTotal;
 
             $results[] = [
                 'candidate_id' => $candidate->candidate_id,
@@ -174,7 +173,8 @@ class PdfReportController extends Controller
                     foreach ($judgeScores as $score) {
                         $category = $categories->firstWhere('category_id', $score->category_id);
                         if ($category) {
-                            $weightedScore = $score->score * ($category->category_weight / 100);
+                            // Apply normalization factor
+                            $weightedScore = $score->score * $category->category_weight * $normalizationFactor;
                             $judgeTotal += $weightedScore;
                         }
                     }
@@ -203,6 +203,7 @@ class PdfReportController extends Controller
             }
         }
 
+        // Rest of the method remains the same for final ranking...
         // Step 6: Calculate Mean Rank for each candidate
         foreach ($results as &$result) {
             $ranks = [];
