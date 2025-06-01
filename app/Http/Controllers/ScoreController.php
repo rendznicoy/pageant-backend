@@ -21,6 +21,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Models\Candidate;
 use App\Events\CandidateSet;
 use App\Models\Stage;
+use App\Services\ScoreCalculationService;
 
 class ScoreController extends Controller
 {
@@ -429,9 +430,13 @@ class ScoreController extends Controller
 
     public function finalResults($event_id)
     {
-        Log::info("Fetching SIMPLE final results for event", ['event_id' => $event_id]);
+        Log::info("Fetching final results for event", ['event_id' => $event_id]);
 
         try {
+            // Get event details
+            $event = Event::findOrFail($event_id);
+            $globalMaxScore = $event->global_max_score ?? 100;
+            
             // Get all active candidates
             $candidates = Candidate::where('event_id', $event_id)
                 ->where('is_active', true)
@@ -450,7 +455,7 @@ class ScoreController extends Controller
                 return response()->json(['candidates' => [], 'judges' => []], 200);
             }
 
-            // Get all categories for the event
+            // Get all categories for the event with their weights
             $categories = Category::where('event_id', $event_id)->get();
 
             if ($categories->isEmpty()) {
@@ -466,62 +471,25 @@ class ScoreController extends Controller
                     'name' => $candidate->first_name . ' ' . $candidate->last_name
                 ]);
 
-                // Check if candidate has ANY confirmed scores at all
-                $totalConfirmedScores = Score::where('event_id', $event_id)
-                    ->where('candidate_id', $candidate->candidate_id)
-                    ->where('status', 'confirmed')
-                    ->count();
-
-                Log::info("Candidate confirmed scores count", [
-                    'candidate_id' => $candidate->candidate_id,
-                    'confirmed_scores' => $totalConfirmedScores
-                ]);
-
-                if ($totalConfirmedScores == 0) {
-                    Log::info("Skipping candidate - no confirmed scores", [
-                        'candidate_id' => $candidate->candidate_id
-                    ]);
-                    continue; // Skip candidates with no confirmed scores at all
-                }
-
                 $judgeRatings = [];
 
-                // Calculate score for each judge
+                // Calculate weighted score for each judge using the helper method
                 foreach ($judges as $judge) {
-                    $judgeTotal = 0;
-                    $categoryCount = 0;
-
-                    // Get all confirmed scores for this judge and candidate
-                    $judgeScores = Score::where('event_id', $event_id)
-                        ->where('candidate_id', $candidate->candidate_id)
-                        ->where('judge_id', $judge->judge_id)
-                        ->where('status', 'confirmed')
-                        ->with('category')
-                        ->get();
-
-                    if ($judgeScores->isNotEmpty()) {
-                        foreach ($judgeScores as $score) {
-                            if ($score->category) {
-                                // Apply category weight
-                                $weightedScore = $score->score * ($score->category->category_weight / 100);
-                                $judgeTotal += $weightedScore;
-                                $categoryCount++;
-                            }
-                        }
-
-                        if ($categoryCount > 0) {
-                            // Calculate average weighted score for this judge
-                            $judgeAverage = $judgeTotal;
-                            $judgeRatings[] = $judgeAverage;
-                            
-                            Log::info("Judge rating calculated", [
-                                'judge_id' => $judge->judge_id,
-                                'candidate_id' => $candidate->candidate_id,
-                                'judge_total' => $judgeTotal,
-                                'category_count' => $categoryCount,
-                                'judge_average' => $judgeAverage
-                            ]);
-                        }
+                    $judgeWeightedScore = ScoreCalculationService::calculateJudgeWeightedScore(
+                        $event_id,
+                        $candidate->candidate_id,
+                        $judge->judge_id,
+                        $categories
+                    );
+                
+                    if ($judgeWeightedScore !== null) {
+                        $judgeRatings[] = $judgeWeightedScore;
+                        
+                        Log::info("Judge rating calculated", [
+                            'judge_id' => $judge->judge_id,
+                            'candidate_id' => $candidate->candidate_id,
+                            'weighted_total' => $judgeWeightedScore
+                        ]);
                     }
                 }
 
@@ -550,10 +518,6 @@ class ScoreController extends Controller
                         'candidate_id' => $candidate->candidate_id,
                         'mean_rating' => round($meanRating, 2),
                         'judges_scored' => count($judgeRatings)
-                    ]);
-                } else {
-                    Log::info("Candidate excluded - no judge ratings", [
-                        'candidate_id' => $candidate->candidate_id
                     ]);
                 }
             }
@@ -617,7 +581,7 @@ class ScoreController extends Controller
 
             // Sort each sex by Mean Rank (ascending), then Mean Rating (descending) for tiebreaker
             usort($males, function($a, $b) {
-                if (abs($a['mean_rank'] - $b['mean_rank']) < 0.01) { // Handle floating point comparison
+                if (abs($a['mean_rank'] - $b['mean_rank']) < 0.01) {
                     return $b['mean_rating'] <=> $a['mean_rating']; // Higher rating wins
                 }
                 return $a['mean_rank'] <=> $b['mean_rank']; // Lower rank wins
@@ -650,12 +614,13 @@ class ScoreController extends Controller
                 ];
             });
 
-            Log::info("SIMPLE final results computed successfully", [
+            Log::info("Final results computed successfully", [
                 'result_count' => count($finalResults),
                 'categories_count' => $categories->count(),
                 'judges_count' => $judges->count(),
                 'males_count' => count($males),
                 'females_count' => count($females),
+                'global_max_score' => $globalMaxScore
             ]);
 
             return response()->json([
@@ -664,7 +629,7 @@ class ScoreController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error("Error in SIMPLE finalResults", [
+            Log::error("Error in finalResults", [
                 'event_id' => $event_id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()

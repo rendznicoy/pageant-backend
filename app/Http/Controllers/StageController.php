@@ -17,6 +17,8 @@ use App\Events\StageStatusUpdated;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Log;
 use App\Models\Judge;
+use App\Models\Event;
+use App\Services\ScoreCalculationService;
 
 class StageController extends Controller
 {
@@ -690,7 +692,10 @@ class StageController extends Controller
     public function permanentPartialResults($event_id, $stage_id)
     {
         Log::info("Fetching permanent partial results", ['event_id' => $event_id, 'stage_id' => $stage_id]);
+        
         $stage = Stage::where('event_id', $event_id)->findOrFail($stage_id);
+        $event = Event::findOrFail($event_id);
+        $globalMaxScore = $event->global_max_score ?? 100;
 
         // Get ALL candidates from the event
         $candidates = Candidate::where('event_id', $event_id)->get();
@@ -717,31 +722,18 @@ class StageController extends Controller
             foreach ($sexCandidates as $candidate) {
                 $judgeRatings = [];
 
-                // Calculate weighted score for each judge
+                // Calculate weighted score for each judge using the service
                 foreach ($judges as $judge) {
-                    $judgeWeightedTotal = 0;
-                    $totalWeight = 0;
-                    $hasScores = false;
+                    $judgeWeightedScore = ScoreCalculationService::calculateJudgeWeightedScore(
+                        $event_id,
+                        $candidate->candidate_id,
+                        $judge->judge_id,
+                        $categories,
+                        $stage_id
+                    );
 
-                    foreach ($categories as $category) {
-                        $score = Score::where('event_id', $event_id)
-                            ->where('candidate_id', $candidate->candidate_id)
-                            ->where('category_id', $category->category_id)
-                            ->where('judge_id', $judge->judge_id)
-                            ->where('stage_id', $stage_id)
-                            ->where('status', 'confirmed')
-                            ->first();
-
-                        if ($score) {
-                            $weightedScore = $score->score * ($category->category_weight / 100);
-                            $judgeWeightedTotal += $weightedScore;
-                            $totalWeight += $category->category_weight;
-                            $hasScores = true;
-                        }
-                    }
-
-                    if ($hasScores && $totalWeight > 0) {
-                        $judgeRatings[] = $judgeWeightedTotal;
+                    if ($judgeWeightedScore !== null) {
+                        $judgeRatings[] = $judgeWeightedScore;
                     }
                 }
 
@@ -749,7 +741,7 @@ class StageController extends Controller
                     continue; // Skip candidates with no scores
                 }
 
-                // Calculate mean rating
+                // Calculate mean rating (same as final results)
                 $meanRating = array_sum($judgeRatings) / count($judgeRatings);
 
                 $processedResults[] = [
@@ -768,7 +760,7 @@ class StageController extends Controller
             }
         }
 
-        // Calculate Mean Rank separately for each sex
+        // Calculate Mean Rank separately for each sex (same logic as final results)
         foreach (['M', 'F'] as $sex) {
             $sexResults = array_filter($processedResults, fn($r) => strtoupper($r['sex']) === $sex);
             
@@ -845,6 +837,7 @@ class StageController extends Controller
             'stage_id' => $stage_id,
             'males_count' => count($rankedMales),
             'females_count' => count($rankedFemales),
+            'global_max_score' => $globalMaxScore
         ]);
 
         return response()->json([

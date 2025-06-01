@@ -36,47 +36,23 @@ class DatabaseSeeder extends Seeder
             'role' => 'tabulator',
         ]);
 
+        // Create two completed events with specific configurations
         $eventConfigs = [
             [
-                'name' => 'Grand Pageant Championship 2025',
+                'name' => 'Grand Pageant Championship 2025 (Max 10)',
                 'venue' => 'VSU Grand Gymnasium',
-                'status' => 'active',
+                'status' => 'completed',
                 'division' => 'standard',
-                'max_score' => 100,
-                'days_offset' => 0,
-                'scenarios' => ['finalized', 'active', 'pending'],
-                'active_candidates' => 6,
+                'global_max_score' => 10,
+                'days_offset' => -15,
             ],
             [
-                'name' => 'Spring Beauty Contest 2025',
+                'name' => 'Spring Beauty Contest 2025 (Max 100)',
                 'venue' => 'University Auditorium',
                 'status' => 'completed',
                 'division' => 'standard',
-                'max_score' => 100,
+                'global_max_score' => 100,
                 'days_offset' => -10,
-                'scenarios' => ['finalized', 'finalized', 'finalized'],
-                'active_candidates' => 10,
-            ],
-            [
-                'name' => 'Male Excellence Competition',
-                'venue' => 'Sports Complex Arena',
-                'status' => 'inactive',
-                'division' => 'male-only',
-                'max_score' => 100,
-                'days_offset' => 5,
-                'scenarios' => ['pending', 'pending', 'pending'],
-                'active_candidates' => 8,
-            ],
-            // Add this new event configuration for testing finalization
-            [
-                'name' => 'Ready to Finalize Event 2025',
-                'venue' => 'Test Arena',
-                'status' => 'active',
-                'division' => 'standard',
-                'max_score' => 100,
-                'days_offset' => -1,
-                'scenarios' => ['finalized', 'finalized', 'finalized'], // All stages finalized
-                'active_candidates' => 8,
             ],
         ];
 
@@ -95,20 +71,23 @@ class DatabaseSeeder extends Seeder
             'description' => 'A prestigious competition showcasing talent, intelligence, and excellence.',
             'status' => $config['status'],
             'division' => $config['division'],
+            'global_max_score' => $config['global_max_score'],
             'created_by' => $admin->user_id,
             'cover_photo' => null,
             'statisticians' => [['name' => 'Dr. Maria Santos']],
         ]);
 
+        // Create exactly 5 judges for each event
         $judgePool = [
-            ['Tracy', 'Johnson'], ['Raed', 'Al-Mansouri'], ['Derick', 'Thompson'],
-            ['Lois', 'Anderson'], ['Kristine', 'Peterson'], ['Marcus', 'Chen'],
-            ['Sofia', 'Rodriguez'], ['David', 'Kim'], ['Emma', 'Wilson']
+            ['Tracy', 'Johnson'], 
+            ['Raed', 'Al-Mansouri'], 
+            ['Derick', 'Thompson'],
+            ['Lois', 'Anderson'], 
+            ['Kristine', 'Peterson']
         ];
-        $judgesForEvent = array_slice($judgePool, 0, 5 + $eventIndex);
 
         $judges = collect();
-        foreach ($judgesForEvent as $i => [$first, $last]) {
+        foreach ($judgePool as $i => [$first, $last]) {
             $user = User::create([
                 'username' => "judge_{$eventIndex}_{$i}",
                 'email' => "judge_{$eventIndex}_{$i}@example.com",
@@ -126,130 +105,145 @@ class DatabaseSeeder extends Seeder
             ]));
         }
 
+        // Create exactly 2 stages: Preliminaries and Finals (both finalized)
         $stages = collect();
-        $stageConfigs = match ($config['division']) {
-            'male-only' => [
-                ['name' => 'Physical Fitness', 'top_count' => 8],
-                ['name' => 'Talent & Interview', 'top_count' => 4],
-                ['name' => 'Formal Wear Finals', 'top_count' => null],
-            ],
-            default => [
-                ['name' => 'Preliminary Round', 'top_count' => 12],
-                ['name' => 'Swimsuit/Talent Competition', 'top_count' => 6],
-                ['name' => 'Evening Gown & Q&A', 'top_count' => null],
-            ],
-        };
+        $stageConfigs = [
+            ['name' => 'Preliminaries', 'status' => 'finalized'],
+            ['name' => 'Finals', 'status' => 'finalized'],
+        ];
 
-        foreach ($stageConfigs as $i => $stageConfig) {
+        foreach ($stageConfigs as $stageConfig) {
             $stages->push(Stage::create([
                 'event_id' => $event->event_id,
                 'stage_name' => $stageConfig['name'],
-                'status' => $config['scenarios'][$i] ?? 'pending',
-                'top_candidates_count' => $stageConfig['top_count'],
+                'status' => $stageConfig['status'],
+                'top_candidates_count' => null,
             ]));
         }
 
-        $candidateData = [
-            ['Alexander', 'Champion', 'Isabella', 'Grace', 'Team Phoenix'],
-            ['Michael', 'Sterling', 'Sophia', 'Radiance', 'Team Nova'],
-            ['William', 'Valor', 'Emma', 'Elegance', 'Team Aurora'],
-            ['James', 'Prestige', 'Olivia', 'Brilliance', 'Team Stellar'],
-            ['Benjamin', 'Excellence', 'Charlotte', 'Sophistication', 'Team Zenith'],
-            ['Lucas', 'Distinction', 'Amelia', 'Magnificence', 'Team Apex'],
-            ['Henry', 'Achievement', 'Harper', 'Splendor', 'Team Elite'],
-            ['Sebastian', 'Success', 'Evelyn', 'Glamour', 'Team Prime'],
-            ['Owen', 'Victory', 'Abigail', 'Allure', 'Team Supreme'],
-            ['Theodore', 'Triumph', 'Emily', 'Enchantment', 'Team Ultimate'],
+        // Create exactly 22 candidates (11 male, 11 female)
+        $maleNames = [
+            ['Alexander', 'Champion'], ['Michael', 'Sterling'], ['William', 'Valor'],
+            ['James', 'Prestige'], ['Benjamin', 'Excellence'], ['Lucas', 'Distinction'],
+            ['Henry', 'Achievement'], ['Sebastian', 'Success'], ['Owen', 'Victory'],
+            ['Theodore', 'Triumph'], ['Gabriel', 'Majesty']
+        ];
+
+        $femaleNames = [
+            ['Isabella', 'Grace'], ['Sophia', 'Radiance'], ['Emma', 'Elegance'],
+            ['Olivia', 'Brilliance'], ['Charlotte', 'Sophistication'], ['Amelia', 'Magnificence'],
+            ['Harper', 'Splendor'], ['Evelyn', 'Glamour'], ['Abigail', 'Allure'],
+            ['Emily', 'Enchantment'], ['Victoria', 'Serenity']
+        ];
+
+        $teams = [
+            'Team Phoenix', 'Team Nova', 'Team Aurora', 'Team Stellar', 'Team Zenith',
+            'Team Apex', 'Team Elite', 'Team Prime', 'Team Supreme', 'Team Ultimate', 'Team Dynasty'
         ];
 
         $candidates = collect();
-        foreach ($candidateData as $num => [$mFirst, $mLast, $fFirst, $fLast, $team]) {
-            $id = $num + 1;
-            if (in_array($config['division'], ['standard', 'male-only'])) {
-                $candidates->push(Candidate::create([
-                    'event_id' => $event->event_id,
-                    'candidate_number' => $id,
-                    'first_name' => $mFirst,
-                    'last_name' => $mLast,
-                    'sex' => 'M',
-                    'team' => $team,
-                    'is_active' => $id <= $config['active_candidates'] ? 1 : 0,
-                    'photo' => null,
-                ]));
-            }
-
-            if (in_array($config['division'], ['standard', 'female-only'])) {
-                $candidates->push(Candidate::create([
-                    'event_id' => $event->event_id,
-                    'candidate_number' => $id,
-                    'first_name' => $fFirst,
-                    'last_name' => $fLast,
-                    'sex' => 'F',
-                    'team' => $team,
-                    'is_active' => $id <= $config['active_candidates'] ? 1 : 0,
-                    'photo' => null,
-                ]));
-            }
+        
+        // Create 11 male candidates
+        foreach ($maleNames as $num => [$first, $last]) {
+            $candidates->push(Candidate::create([
+                'event_id' => $event->event_id,
+                'candidate_number' => $num + 1,
+                'first_name' => $first,
+                'last_name' => $last,
+                'sex' => 'M',
+                'team' => $teams[$num],
+                'is_active' => true,
+                'photo' => null,
+            ]));
         }
 
-        $categorySets = [
-            'standard' => [
-                ['Physical Fitness', 25], ['Stage Presence', 30],
-                ['Communication Skills', 25], ['Overall Appeal', 20]
-            ],
-            'male-only' => [
-                ['Conditioning', 30], ['Stage Impact', 40], ['Confidence', 30]
-            ]
-        ];
+        // Create 11 female candidates
+        foreach ($femaleNames as $num => [$first, $last]) {
+            $candidates->push(Candidate::create([
+                'event_id' => $event->event_id,
+                'candidate_number' => $num + 1,
+                'first_name' => $first,
+                'last_name' => $last,
+                'sex' => 'F',
+                'team' => $teams[$num],
+                'is_active' => true,
+                'photo' => null,
+            ]));
+        }
 
-        $categoryData = $categorySets[$config['division']] ?? $categorySets['standard'];
+        // Create categories for each stage
         $categories = collect();
+        
         foreach ($stages as $stage) {
-            foreach ($categoryData as [$name, $weight]) {
-                $categories->push(Category::create([
-                    'event_id' => $event->event_id,
-                    'stage_id' => $stage->stage_id,
-                    'category_name' => $name,
-                    'category_weight' => $weight,
-                    'max_score' => $config['max_score'],
-                    'status' => $stage->status === 'finalized' ? 'finalized' : 'pending',
-                ]));
+            if ($stage->stage_name === 'Preliminaries') {
+                // Preliminaries: 6 categories
+                $preliminaryCategories = [
+                    ['Beauty', 20],
+                    ['Q & A', 10],
+                    ['Talent', 10],
+                    ['Performance', 20],
+                    ['Swim Wear', 20],
+                    ['Formal Wear', 20],
+                ];
+
+                foreach ($preliminaryCategories as [$name, $weight]) {
+                    $categories->push(Category::create([
+                        'event_id' => $event->event_id,
+                        'stage_id' => $stage->stage_id,
+                        'category_name' => $name,
+                        'category_weight' => $weight,
+                        'max_score' => $config['global_max_score'],
+                        'status' => 'finalized',
+                    ]));
+                }
+            } else { // Finals
+                // Finals: 2 categories
+                $finalCategories = [
+                    ['Q & A', 50],
+                    ['Beauty', 50],
+                ];
+
+                foreach ($finalCategories as [$name, $weight]) {
+                    $categories->push(Category::create([
+                        'event_id' => $event->event_id,
+                        'stage_id' => $stage->stage_id,
+                        'category_name' => $name,
+                        'category_weight' => $weight,
+                        'max_score' => $config['global_max_score'],
+                        'status' => 'finalized',
+                    ]));
+                }
             }
         }
 
-        // Define candidate performance levels for more realistic scoring
-        $candidatePerformanceLevels = [
-            1 => ['base' => 0.92, 'variance' => 0.04], // Excellent performer
-            2 => ['base' => 0.88, 'variance' => 0.05], // Very good
-            3 => ['base' => 0.85, 'variance' => 0.06], // Good
-            4 => ['base' => 0.82, 'variance' => 0.05], // Above average
-            5 => ['base' => 0.78, 'variance' => 0.07], // Average
-            6 => ['base' => 0.75, 'variance' => 0.06], // Below average
-            7 => ['base' => 0.72, 'variance' => 0.08], // Needs improvement
-            8 => ['base' => 0.70, 'variance' => 0.07], // Poor
-            9 => ['base' => 0.68, 'variance' => 0.09], // Very poor
-            10 => ['base' => 0.65, 'variance' => 0.08], // Worst performer
-        ];
-
-        // Judge bias/preferences (some judges are stricter/more generous)
-        $judgeBiases = [];
-        foreach ($judges as $index => $judge) {
-            $judgeBiases[$judge->judge_id] = [
-                'generosity' => 0.97 + ($index * 0.015), // Range from 0.97 to ~1.06
-                'consistency' => 0.02 + ($index * 0.005), // Range from 0.02 to ~0.06
+        // Define candidate performance levels for realistic scoring
+        $candidatePerformanceLevels = [];
+        for ($i = 1; $i <= 11; $i++) {
+            $candidatePerformanceLevels[$i] = [
+                'base' => 0.95 - ($i - 1) * 0.03, // Decreasing performance from 0.95 to 0.65
+                'variance' => 0.04 + ($i - 1) * 0.003, // Increasing variance
             ];
         }
 
-        // Generate scores for finalized stages
+        // Judge bias/preferences
+        $judgeBiases = [];
+        foreach ($judges as $index => $judge) {
+            $judgeBiases[$judge->judge_id] = [
+                'generosity' => 0.97 + ($index * 0.02), // Range from 0.97 to 1.05
+                'consistency' => 0.02 + ($index * 0.005), // Range from 0.02 to 0.04
+            ];
+        }
+
+        // Generate scores for all finalized stages and categories
         foreach ($judges as $judge) {
             foreach ($candidates as $candidate) {
-                foreach ($stages->where('status', 'finalized') as $stage) {
+                foreach ($stages as $stage) {
                     foreach ($categories->where('stage_id', $stage->stage_id) as $category) {
                         $score = $this->generateScore(
                             $candidate->candidate_number,
                             $judge->judge_id,
                             $category->category_name,
-                            $config['max_score'],
+                            $config['global_max_score'],
                             $candidatePerformanceLevels,
                             $judgeBiases
                         );
@@ -262,93 +256,59 @@ class DatabaseSeeder extends Seeder
                             'candidate_id' => $candidate->candidate_id,
                             'score' => $score,
                             'status' => 'confirmed',
-                            'comments' => $this->generateComment($score, $config['max_score']),
+                            'comments' => $this->generateComment($score, $config['global_max_score']),
                         ]);
-                    }
-                }
-            }
-        }
-
-        // Add partial scores for active events with varied scoring
-        if ($event->status === 'active') {
-            $activeStage = $stages->firstWhere('status', 'active');
-            if ($activeStage) {
-                $activeCategories = $categories->where('stage_id', $activeStage->stage_id);
-                $activeCandidates = $candidates->where('is_active', 1)->take(4);
-                $scoringJudges = $judges->take(ceil($judges->count() * 0.6));
-
-                foreach ($scoringJudges as $judge) {
-                    foreach ($activeCandidates as $candidate) {
-                        foreach ($activeCategories as $category) {
-                            // For active stage, add some improvement/decline from previous performance
-                            $score = $this->generateScore(
-                                $candidate->candidate_number,
-                                $judge->judge_id,
-                                $category->category_name,
-                                $config['max_score'],
-                                $candidatePerformanceLevels,
-                                $judgeBiases,
-                                0.03 // Additional variance for active stage
-                            );
-
-                            Score::create([
-                                'event_id' => $event->event_id,
-                                'judge_id' => $judge->judge_id,
-                                'stage_id' => $activeStage->stage_id,
-                                'category_id' => $category->category_id,
-                                'candidate_id' => $candidate->candidate_id,
-                                'score' => $score,
-                                'status' => 'confirmed',
-                                'comments' => $this->generateComment($score, $config['max_score']),
-                            ]);
-                        }
                     }
                 }
             }
         }
     }
 
-    // In the generateScore method of DatabaseSeeder.php
     private function generateScore($candidateNumber, $judgeId, $categoryName, $maxScore, $performanceLevels, $judgeBiases, $extraVariance = 0)
     {
         // Get candidate's base performance level
-        $performance = $performanceLevels[$candidateNumber] ?? $performanceLevels[5];
+        $performance = $performanceLevels[$candidateNumber] ?? $performanceLevels[6];
         
         // Get judge bias
         $judgeBias = $judgeBiases[$judgeId] ?? ['generosity' => 1.0, 'consistency' => 0.03];
         
-        // Add judge-specific preferences (some judges prefer certain candidates)
+        // Add judge-specific preferences
         $judgePreference = 1.0;
-        $judgeIndex = $judgeId % 5; // Cycle through judge preferences
-        if (($judgeIndex === 0 && in_array($candidateNumber, [1, 3])) ||
-            ($judgeIndex === 1 && in_array($candidateNumber, [2, 4])) ||
-            ($judgeIndex === 2 && in_array($candidateNumber, [1, 5])) ||
-            ($judgeIndex === 3 && in_array($candidateNumber, [3, 6])) ||
-            ($judgeIndex === 4 && in_array($candidateNumber, [2, 6]))) {
-            $judgePreference = 1.1; // 10% bonus for preferred candidates
+        $judgeIndex = $judgeId % 5;
+        if (($judgeIndex === 0 && in_array($candidateNumber, [1, 3, 7])) ||
+            ($judgeIndex === 1 && in_array($candidateNumber, [2, 4, 8])) ||
+            ($judgeIndex === 2 && in_array($candidateNumber, [1, 5, 9])) ||
+            ($judgeIndex === 3 && in_array($candidateNumber, [3, 6, 10])) ||
+            ($judgeIndex === 4 && in_array($candidateNumber, [2, 6, 11]))) {
+            $judgePreference = 1.08; // 8% bonus for preferred candidates
         }
         
         // Category-specific adjustments
         $categoryMultiplier = 1.0;
         switch ($categoryName) {
-            case 'Physical Fitness':
-            case 'Conditioning':
-                if (in_array($candidateNumber, [1, 3, 5])) $categoryMultiplier = 1.08;
-                if (in_array($candidateNumber, [2, 4, 6])) $categoryMultiplier = 0.95;
+            case 'Beauty':
+                if (in_array($candidateNumber, [1, 2, 5, 8])) $categoryMultiplier = 1.05;
+                if (in_array($candidateNumber, [9, 10, 11])) $categoryMultiplier = 0.95;
                 break;
-            case 'Stage Presence':
-            case 'Stage Impact':
-                if (in_array($candidateNumber, [2, 4, 6])) $categoryMultiplier = 1.06;
-                if (in_array($candidateNumber, [1, 3, 5])) $categoryMultiplier = 0.97;
+            case 'Q & A':
+                if (in_array($candidateNumber, [1, 3, 4, 6])) $categoryMultiplier = 1.06;
+                if (in_array($candidateNumber, [8, 9, 10])) $categoryMultiplier = 0.94;
                 break;
-            case 'Communication Skills':
-                if (in_array($candidateNumber, [1, 2, 4])) $categoryMultiplier = 1.05;
-                if (in_array($candidateNumber, [3, 5, 6])) $categoryMultiplier = 0.96;
+            case 'Talent':
+                if (in_array($candidateNumber, [2, 4, 7, 9])) $categoryMultiplier = 1.07;
+                if (in_array($candidateNumber, [5, 6, 11])) $categoryMultiplier = 0.93;
                 break;
-            case 'Overall Appeal':
-            case 'Confidence':
-                if (in_array($candidateNumber, [1, 2])) $categoryMultiplier = 1.03;
-                if (in_array($candidateNumber, [5, 6])) $categoryMultiplier = 0.98;
+            case 'Performance':
+                if (in_array($candidateNumber, [1, 3, 5, 7])) $categoryMultiplier = 1.04;
+                if (in_array($candidateNumber, [8, 10, 11])) $categoryMultiplier = 0.96;
+                break;
+            case 'Swim Wear':
+                if (in_array($candidateNumber, [2, 3, 6, 8])) $categoryMultiplier = 1.05;
+                if (in_array($candidateNumber, [9, 10, 11])) $categoryMultiplier = 0.95;
+                break;
+            case 'Formal Wear':
+                if (in_array($candidateNumber, [1, 4, 5, 9])) $categoryMultiplier = 1.06;
+                if (in_array($candidateNumber, [7, 10, 11])) $categoryMultiplier = 0.94;
                 break;
         }
         
